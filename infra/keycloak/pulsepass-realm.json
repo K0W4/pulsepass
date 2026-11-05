@@ -1,0 +1,121 @@
+{
+  "realm": "pulsepass",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 604800,
+  "ssoSessionMaxLifespan": 604800,
+  "offlineSessionIdleTimeout": 604800,
+  "roles": {
+    "realm": [
+      {
+        "name": "cliente",
+        "description": "Compra ingressos"
+      },
+      {
+        "name": "organizador",
+        "description": "Gerencia eventos"
+      },
+      {
+        "name": "operador",
+        "description": "Valida ingressos na portaria"
+      },
+      {
+        "name": "admin",
+        "description": "Administra a plataforma"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "pulsepass-api",
+      "name": "PulsePass API",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "http://localhost:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "fullScopeAllowed": true
+    }
+  ],
+  "users": [
+    {
+      "username": "cliente@pulsepass.test",
+      "email": "cliente@pulsepass.test",
+      "firstName": "Cliente",
+      "lastName": "PulsePass",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "pulsepass-dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "cliente"
+      ]
+    },
+    {
+      "username": "organizador@pulsepass.test",
+      "email": "organizador@pulsepass.test",
+      "firstName": "Organizador",
+      "lastName": "PulsePass",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "pulsepass-dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "organizador"
+      ]
+    },
+    {
+      "username": "operador@pulsepass.test",
+      "email": "operador@pulsepass.test",
+      "firstName": "Operador",
+      "lastName": "PulsePass",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "pulsepass-dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "operador"
+      ]
+    },
+    {
+      "username": "admin@pulsepass.test",
+      "email": "admin@pulsepass.test",
+      "firstName": "Admin",
+      "lastName": "PulsePass",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "pulsepass-dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    }
+  ]
+}

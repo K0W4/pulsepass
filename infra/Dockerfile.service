@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+# Imagem comum dos serviços: docker build -f infra/Dockerfile.service --build-arg MODULE=checkout-service .
+FROM eclipse-temurin:21-jdk AS build
+ARG MODULE
+WORKDIR /src
+COPY . .
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B -q -pl services/${MODULE} -am package -DskipTests -Dspotless.check.skip=true
+
+FROM eclipse-temurin:21-jre
+ARG MODULE
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN useradd --system --uid 10001 app
+USER app
+WORKDIR /app
+COPY --from=build /src/services/${MODULE}/target/*.jar app.jar
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]

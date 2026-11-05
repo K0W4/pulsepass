@@ -1,0 +1,38 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWK_SET_URI:http://localhost:8081/realms/pulsepass/protocol/openid-connect/certs}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: inventario
+              uri: ${INVENTARIO_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/eventos/**,/api/reservas/**
+              filters:
+                - StripPrefix=1
+            - id: checkout
+              uri: ${CHECKOUT_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/pedidos/**,/api/pagamentos/**
+              filters:
+                - StripPrefix=1
+            - id: emissao
+              uri: ${EMISSAO_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/ingressos/**,/api/validacoes/**
+              filters:
+                - StripPrefix=1
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
