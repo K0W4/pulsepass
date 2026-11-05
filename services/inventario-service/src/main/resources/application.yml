@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: inventario-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/db_inventario}
+    username: ${DB_USER:pulsepass}
+    password: ${DB_PASSWORD:pulsepass}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: inventario-checkout.pedido.v1
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 8000
+        max.block.ms: 4000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWK_SET_URI:http://localhost:8081/realms/pulsepass/protocol/openid-connect/certs}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+pulsepass:
+  reserva:
+    ttl: ${RESERVA_TTL:PT10M}
