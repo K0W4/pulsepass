@@ -1,0 +1,14 @@
+server:
+  port: ${PORT:8090}
+spring:
+  application:
+    name: gateway-pagamento
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+gateway:
+  modo: ${GATEWAY_MODO:APROVAR}
+  atraso-ms: ${GATEWAY_ATRASO_MS:0}
+  falhar: ${GATEWAY_FALHAR:false}
