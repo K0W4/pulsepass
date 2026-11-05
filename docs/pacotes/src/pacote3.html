@@ -1,0 +1,112 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>PulsePass – Pacote 3</title><style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm;
+    @bottom-center { content: "PulsePass · Pacote 3 · " counter(page); font: 9pt Helvetica, Arial, sans-serif; color: #666; } }
+  @page wide { size: A4 landscape; margin: 14mm 12mm;
+    @bottom-center { content: "PulsePass · Pacote 3 · " counter(page); font: 9pt Helvetica, Arial, sans-serif; color: #666; } }
+  @page cover { margin: 0; @bottom-center { content: none; } }
+  * { box-sizing: border-box; }
+  body { font: 10pt/1.4 Helvetica, Arial, sans-serif; color: #1b1b1b; margin: 0; }
+  h1 { font-size: 17pt; color: #12305a; border-bottom: 2px solid #e8731a; padding-bottom: 4px; margin: 0 0 10px; break-after: avoid; }
+  h2 { font-size: 13pt; color: #12305a; margin: 18px 0 6px; break-after: avoid; }
+  h3 { font-size: 11pt; color: #333; margin: 14px 0 4px; break-after: avoid; }
+  p { margin: 5px 0; }
+  ul, ol { margin: 4px 0 6px 18px; padding: 0; }
+  li { margin: 2px 0; }
+  code { font: 9pt Menlo, Consolas, monospace; background: #f1f3f6; padding: 0 3px; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 8.8pt; break-inside: auto; }
+  th { background: #12305a; color: #fff; text-align: left; padding: 4px 6px; }
+  td { border: 1px solid #cfd6df; padding: 3px 6px; vertical-align: top; }
+  tr { break-inside: avoid; }
+  tr:nth-child(even) td { background: #f6f8fb; }
+  .section { break-before: page; }
+  .box { background: #fff4e8; border-left: 4px solid #e8731a; padding: 6px 10px; margin: 8px 0; font-size: 9.5pt; }
+  .fig { margin: 10px 0; text-align: center; break-inside: avoid; }
+  .fig .cap { font-size: 9pt; color: #555; margin-top: 3px; }
+  .fig svg { width: auto !important; height: auto !important; max-width: 100% !important; max-height: 190mm; }
+  .wide { page: wide; break-before: page; }
+  .wide .fig svg { max-height: 128mm; }
+  .fig.sm svg { max-height: 105mm; }
+  .cover { page: cover; height: 297mm; padding: 60mm 24mm 24mm; background: #12305a; color: #fff; break-after: page; }
+  .cover small { letter-spacing: .08em; color: #f4b27a; }
+  .cover h1 { color: #fff; font-size: 46pt; border: 0; margin: 14mm 0 2mm; }
+  .cover h2 { color: #fff; font-size: 17pt; font-weight: normal; margin: 0 0 18mm; }
+  .cover p { font-size: 11pt; margin: 3px 0; }
+  .toc li { margin: 3px 0; }
+  pre { font: 8.5pt/1.35 Menlo, Consolas, monospace; background: #f1f3f6; padding: 8px 10px; border-radius: 4px; break-inside: avoid; margin: 6px 0; white-space: pre-wrap; }
+</style></head><body>
+<div class="cover">
+  <p>PONTIFÍCIA UNIVERSIDADE CATÓLICA DO RIO GRANDE DO SUL<br>ESCOLA POLITÉCNICA<br>46504-04 · Construção de Software · Turma 330 · 2026/2<br>Prof. Michael da Costa Mora</p>
+  <p style="margin-top:14mm"><small>PROJETO INTEGRADOR · PACOTE 3</small></p>
+  <h1>PulsePass</h1>
+  <h2>Checkpoint do Desenvolvimento</h2>
+  <p>Estado do código, documentação atualizada dos Pacotes 1 e 2 e evidências de teste</p>
+  <p style="margin-top:22mm">Integrantes: Gabriel Kowaleski e Mayra Bordin</p>
+  <p>Repositório: <b>REPO_URL</b></p>
+  <p>Entrega: 23 de novembro de 2026</p>
+</div>
+
+<h1>1. Resumo do checkpoint</h1>
+<p>O repositório contém a fatia vertical <b>R1</b> do backend do PulsePass: do catálogo de eventos até o ingresso validado na portaria, passando por reserva atômica, pagamento idempotente, Outbox e Kafka. Tudo sobe com <code>docker compose up -d --wait</code> (PostgreSQL, Redis, Kafka e Kafka UI, Keycloak, API Gateway, três serviços de negócio e o simulador de pagamento) e o script <code>scripts/smoke.sh</code> percorre o fluxo completo pelo gateway, autenticando no Keycloak.</p>
+<table><thead><tr><th style="width:30%">Indicador</th><th>Resultado</th></tr></thead>
+<tr><td>Testes automatizados</td><td><b>52</b>, todos passando: 20 unitários, 25 de integração com PostgreSQL, Redis e Kafka reais (Testcontainers), 3 do simulador e 4 do gateway.</td></tr>
+<tr><td>Cobertura de linhas do domínio</td><td>Inventário 100%, Checkout 100%, Emissão 93% (meta: 70%, verificada no build).</td></tr>
+<tr><td>Teste de mutação (PIT)</td><td>100% dos mutantes mortos nos três domínios (meta: 60%).</td></tr>
+<tr><td>Smoke ponta a ponta</td><td>Passa contra os 10 contêineres reais, incluindo RBAC, idempotência, ingresso em PDF e validação do QR.</td></tr>
+<tr><td>Histórias de R1 e R2 entregues</td><td>19 de 21 atendidas; 2 parciais (US01, sem auto-cadastro; US14, sem WebSocket).</td></tr>
+<tr><td>Requisitos não funcionais</td><td>11 atendidos, 7 parciais, 5 pendentes (seção 4).</td></tr></table>
+<div class="box"><b>Limites honestos.</b> A CI (GitHub Actions) foi escrita, mas só roda depois da publicação do repositório. Testes de carga (k6), de réplicas e de falha do emissao-service não foram executados. A cobertura de 70% mede o pacote <code>domain</code> (máquinas de estado e regras puras); a orquestração dos serviços é exercida pelos testes de integração, mas não entra nesse percentual.</div>
+
+<h2>1.1 Como reproduzir</h2>
+<pre>cp .env.example .env
+docker compose up -d --build --wait
+./scripts/smoke.sh
+./mvnw verify                      # unitários + integração + formatação + cobertura do domínio
+./mvnw -Pmutacao -pl services/inventario-service test-compile org.pitest:pitest-maven:mutationCoverage -DskipITs
+docker compose down -v</pre>
+<p>Pré-requisitos: Docker com Compose e Java 21 (o Maven vem pelo wrapper). O <code>README.md</code> do repositório traz os detalhes, as portas e os testes que sustentam cada requisito.</p>
+
+<div class="section"><h1>2. Estado do backlog (Pacote 1)</h1>
+<p>Status das histórias da release R1 e das de R2 que foram entregues junto, com a evidência de cada uma. Histórias não citadas individualmente estão no último grupo.</p>
+<table><thead><tr><th style="width:9%">História</th><th style="width:27%">Descrição</th><th style="width:10%">Status</th><th style="width:54%">Evidência</th></tr></thead><tr><td>US01</td><td>Criar conta com e-mail e senha</td><td>Parcial</td><td>Contas de teste no realm do Keycloak; o auto-cadastro está desligado (<code>registrationAllowed=false</code>).</td></tr><tr><td>US02</td><td>Entrar e receber token de acesso</td><td>Atendido</td><td><code>smoke.sh</code> obtém tokens no Keycloak e os usa pelo gateway.</td></tr><tr><td>US04</td><td>Papel adequado em cada rota (RBAC)</td><td>Atendido</td><td>401 e 403 testados em todos os serviços (<code>ConsumidorEApiIT</code>, <code>CheckoutIT</code>, <code>EmissaoIT</code>, <code>RotasTest</code>) e no smoke.</td></tr><tr><td>US07</td><td>Cadastrar evento</td><td>Atendido</td><td><code>ConsumidorEApiIT</code>, <code>smoke.sh</code>.</td></tr><tr><td>US08</td><td>Criar lotes com preço, quantidade e período</td><td>Atendido</td><td><code>Fixtures</code> nos testes e <code>smoke.sh</code>.</td></tr><tr><td>US09</td><td>Setores e assentos numerados (R2)</td><td>Atendido</td><td>Setor marcado cria os assentos; usado em todos os testes de reserva.</td></tr><tr><td>US11</td><td>Listar eventos</td><td>Atendido</td><td>Catálogo público com cache Redis; <code>smoke.sh</code>.</td></tr><tr><td>US12</td><td>Detalhes, lotes e disponibilidade</td><td>Atendido</td><td><code>GET /eventos/{id}</code>; disponibilidade por assento livre ou por contadores do lote.</td></tr><tr><td>US14</td><td>Mapa de assentos livre, reservado e vendido</td><td>Parcial</td><td>API pronta (<code>GET /eventos/{id}/assentos</code>); a atualização por WebSocket e a SPA ficam para o Pacote 4.</td></tr><tr><td>US15</td><td>Reserva atômica por 10 minutos</td><td>Atendido</td><td><code>ReservaConcorrenteIT</code>: 500 reservas simultâneas, 1 sucesso e 499 conflitos.</td></tr><tr><td>US16</td><td>Liberar reservas não pagas</td><td>Atendido</td><td><code>ExpiracaoEOutboxIT</code>.</td></tr><tr><td>US17</td><td>Cancelar reserva (R2)</td><td>Atendido</td><td><code>ConsumidorEApiIT.clienteCancelaAReserva...</code>.</td></tr><tr><td>US19</td><td>Revisar pedido com itens e total</td><td>Atendido</td><td><code>GET /pedidos/{id}</code>; <code>CheckoutIT</code>.</td></tr><tr><td>US20</td><td>Pagar o pedido</td><td>Atendido</td><td><code>CheckoutIT</code>, <code>smoke.sh</code>.</td></tr><tr><td>US21</td><td>Clique repetido não cobra duas vezes</td><td>Atendido</td><td><code>CheckoutIT</code>: 1 chamada ao gateway; 20 chamadas concorrentes, 1 pagamento.</td></tr><tr><td>US23</td><td>Pagamento recusado e nova tentativa (R2)</td><td>Atendido</td><td><code>CheckoutIT</code>: recusa volta a RESERVADO e a segunda tentativa paga.</td></tr><tr><td>US24</td><td>Ingresso em PDF com QR Code</td><td>Atendido</td><td><code>EmissaoIT</code> (PDF lido pelo PDFBox) e <code>smoke.sh</code>.</td></tr><tr><td>US26</td><td>Ver todos os meus ingressos</td><td>Atendido</td><td><code>GET /ingressos</code> (API).</td></tr><tr><td>US28</td><td>Operador lê o QR e vê se é válido</td><td>Atendido</td><td><code>EmissaoIT</code>, <code>smoke.sh</code>.</td></tr><tr><td>US29</td><td>Ingresso usado é recusado (R2)</td><td>Atendido</td><td>Resposta 409 com o horário da primeira leitura; 50 leituras simultâneas liberam 1.</td></tr><tr><td>US31</td><td>Total vendido e ocupação por lote</td><td>Atendido</td><td><code>GET /eventos/{id}/vendas</code>, só para o dono do evento (<code>ConsumidorEApiIT</code>).</td></tr><tr><td>US03, US05, US06, US10, US13, US18, US22, US25, US27, US30, US32 a US39</td><td>Renovação automática da sessão, cadastro de organizador, auditoria, publicar evento, busca, fila virtual, publicação por Outbox como história própria, e-mail, tempo real, painéis</td><td>Pendente</td><td>Fora da fatia R1. US22 está atendida na prática (Outbox em todos os serviços), mas sem história própria no código.</td></tr></table>
+</div>
+
+<div class="section"><h1>3. Divergências em relação ao Pacote 2</h1>
+<p>O desenho do Pacote 2 foi seguido, com as diferenças abaixo. Todas estão registradas aqui e, quando afetam contratos, no documento atualizado do Pacote 2 (seção 8).</p>
+<table><thead><tr><th style="width:16%">Seção do Pacote 2</th><th style="width:27%">Desenhado</th><th style="width:57%">Como ficou</th></tr></thead><tr><td>2.3.2 Checkout</td><td><code>IdempotencyFilter</code> como filtro servlet</td><td>A lógica está em <code>PagamentoService</code> (TX1, gateway fora de transação, TX2). Mesmas regras; chamada concorrente com a mesma chave enquanto a primeira roda recebe 409.</td></tr><tr><td>2.3.2 Checkout</td><td>Falha do gateway</td><td>Responde 503; o pagamento falho passa a ter chave própria (<code>#falha:id</code>) para a chave do cliente poder ser reutilizada. Recusa responde 402.</td></tr><tr><td>2.3.3 Emissão</td><td><code>PdfStorage</code> e <code>NotificacaoWorker</code>/<code>EmailSender</code></td><td>O PDF é gerado sob demanda, sem armazenamento (serviço continua sem estado). E-mail e a tabela <code>NOTIFICACAO</code> ficam para o Pacote 4 (US25 é R2).</td></tr><tr><td>2.2 Contêineres</td><td>iam-service, telemetria-service, realtime-service e SPA</td><td>Não implementados no Pacote 3. Os papéis vêm direto do Keycloak (<code>realm_access.roles</code>), e cada serviço valida o JWT pelo JWKS.</td></tr><tr><td>2.2 Contêineres</td><td>API Gateway com rate limit</td><td>O gateway valida JWT e roteia sob o prefixo <code>/api</code>; o rate limit não foi implementado.</td></tr><tr><td>2.3.1 Inventário</td><td><code>FilaController</code> e fila virtual</td><td>Não implementados. O Redis é usado só para o cache do catálogo e para o <code>SeatLock</code>.</td></tr><tr><td>3 Dados</td><td>Tabela de Outbox</td><td><code>outbox_event</code> guarda <code>topic</code>, <code>msg_key</code> e o envelope completo em <code>body</code>. A reserva ganhou <code>suspensa_ate</code> (ADR-008) e o lote tem <code>check</code> contra sobre-venda. O ingresso guarda <code>evento_nome</code> e <code>descricao</code> copiados do pedido.</td></tr><tr><td>4 Kafka</td><td>Criação de tópicos</td><td>Um contêiner <code>kafka-init</code> cria os tópicos com as partições da seção 4.2 e a criação automática está desligada. Sem isso, o consumidor que subia primeiro fazia o Kafka criar o tópico com 1 partição (defeito encontrado no smoke). Existem os tópicos de reserva, assento, pedido, ingresso e três DLQs; os de IAM e telemetria não foram criados.</td></tr><tr><td>4 Kafka</td><td>DLQ</td><td>Três tentativas com intervalo de 500 ms e depois o tópico <code>&lt;tópico&gt;.&lt;grupo&gt;.dlq</code>, na biblioteca <code>commons</code>.</td></tr><tr><td>5 Pipeline</td><td>Etapas</td><td>Workflow <code>.github/workflows/ci.yml</code> com lint, testes, smoke, varredura de segredos, PIT (perfil Maven <code>mutacao</code>, no push em develop e à noite) e publicação no GHCR. Compose sem OpenTelemetry, Prometheus, Grafana e Mailpit.</td></tr><tr><td>1.1 Stack</td><td>Versões</td><td>Spring Boot 3.5.16, Spring Cloud 2025.0.3, Resilience4j 2.4.0 (uso programático), PDFBox 3.0.8, ZXing 3.5.4, Testcontainers 2.x, Keycloak 26.0.</td></tr></table>
+</div>
+
+<div class="section"><h1>4. Requisitos não funcionais: estado e evidência</h1>
+<table><thead><tr><th style="width:8%">RNF</th><th style="width:24%">Requisito</th><th style="width:10%">Estado</th><th style="width:58%">Evidência</th></tr></thead><tr><td>RNF01</td><td>Zero sobre-venda</td><td>Atendido</td><td><code>ReservaConcorrenteIT</code> (assento e lote); restrição <code>check</code> no banco como última barreira.</td></tr><tr><td>RNF02</td><td>Expiração em 10 min + 30 s</td><td>Atendido</td><td><code>ExpiracaoEOutboxIT</code> (TTL reduzido a 2 s no teste); suspensão limitada a 30 s.</td></tr><tr><td>RNF03</td><td>Pagamento idempotente</td><td>Atendido</td><td><code>CheckoutIT</code>.</td></tr><tr><td>RNF04</td><td>Transactional Outbox</td><td>Atendido</td><td><code>ExpiracaoEOutboxIT</code>: com o Kafka pausado o evento fica pendente e sai quando ele volta.</td></tr><tr><td>RNF05</td><td>Consumo idempotente</td><td>Atendido</td><td>Duplicata de <code>PedidoPago</code>, <code>ReservaCriada</code> e <code>ReservaExpirada</code> testada nos três serviços.</td></tr><tr><td>RNF06</td><td>Catálogo p95 ≤ 200 ms a 1.000 req/s</td><td>Parcial</td><td>Cache Redis implementado; teste de carga (k6) não executado.</td></tr><tr><td>RNF07</td><td>Reserva p95 ≤ 500 ms a 200/s</td><td>Parcial</td><td>Filtro Redis implementado; teste de carga não executado.</td></tr><tr><td>RNF08</td><td>Ingresso em até 30 s (p95)</td><td>Pendente</td><td>Depende do telemetria-service. Na prática o ingresso aparece em poucos segundos no smoke.</td></tr><tr><td>RNF09</td><td>Réplicas sem erro funcional</td><td>Parcial</td><td>Sem estado em memória; Outbox e expiração usam <code>SKIP LOCKED</code>; teste com 2 réplicas não executado.</td></tr><tr><td>RNF10</td><td>Timeout, retry e circuit breaker</td><td>Atendido</td><td><code>CheckoutIT</code>: 3 tentativas com backoff, 503, pedido volta a RESERVADO.</td></tr><tr><td>RNF11</td><td>Emissão fora não impede a venda</td><td>Parcial</td><td>O desenho vale (Kafka retém); não há teste derrubando o emissao-service.</td></tr><tr><td>RNF12</td><td>JWT stateless (15 min, refresh 7 dias)</td><td>Parcial</td><td>401 sem token testado; tempos configurados no realm, mas a renovação não foi testada.</td></tr><tr><td>RNF13</td><td>RBAC em todas as rotas</td><td>Atendido</td><td>Testes por papel nos serviços e no gateway.</td></tr><tr><td>RNF14</td><td>QR assinado</td><td>Atendido</td><td><code>DominioTest</code> e <code>EmissaoIT</code>: adulterado ou de outro segredo é rejeitado.</td></tr><tr><td>RNF15</td><td>LGPD</td><td>Parcial</td><td>Senhas só no Keycloak; os serviços guardam apenas o identificador do usuário; sem revisão formal de logs.</td></tr><tr><td>RNF16</td><td>Observabilidade</td><td>Pendente</td><td>OpenTelemetry, Prometheus, Grafana e correlation-id ficam para o Pacote 4.</td></tr><tr><td>RNF17</td><td>Cobertura > 70% e Testcontainers</td><td>Atendido</td><td>Domínio com 100%, 100% e 93% de linhas; integração com PostgreSQL, Redis e Kafka reais.</td></tr><tr><td>RNF18</td><td>Lint e arquitetura documentada</td><td>Atendido</td><td>Spotless (google-java-format) falha o build; C4 e ADRs no Pacote 2.</td></tr><tr><td>RNF19</td><td>Ambiente com um comando</td><td>Atendido</td><td><code>docker compose up -d --wait</code> sobe 10 contêineres saudáveis; verificado nesta máquina.</td></tr><tr><td>RNF20</td><td>CI bloqueia PR vermelho</td><td>Parcial</td><td>Workflow escrito e validado como YAML; ainda não executou no GitHub porque o repositório não foi publicado.</td></tr><tr><td>RNF21</td><td>Compra em até 5 telas</td><td>Pendente</td><td>Sem SPA no Pacote 3.</td></tr><tr><td>RNF22</td><td>Acessibilidade WCAG AA</td><td>Pendente</td><td>Sem SPA no Pacote 3.</td></tr><tr><td>RNF23</td><td>Fila virtual por ordem de chegada</td><td>Pendente</td><td>Não implementada.</td></tr></table>
+</div>
+
+<div class="section"><h1>5. Atualizações do Pacote 1</h1>
+<p>O Pacote 1 entregue continua válido. As atualizações são estas:</p>
+<ul>
+  <li><b>Backlog:</b> o status por história está na seção 2. Nenhuma história foi removida; as de R2 e R3 não citadas seguem como candidatas.</li>
+  <li><b>Regras esclarecidas durante a construção:</b> (1) o pedido nasce CRIADO e vira RESERVADO quando a reserva é confirmada pelo evento do Inventário; (2) pagamento recusado ou falha do gateway devolvem o pedido a RESERVADO, para nova tentativa enquanto a reserva estiver ativa; (3) a capacidade de um lote é controlada por contadores (<code>qtd_reservada</code> e <code>qtd_vendida</code>); (4) a expiração da reserva fica suspensa por até 30 s durante o pagamento.</li>
+  <li><b>Processo com IA (SDD):</b> as três funcionalidades críticas têm spec em <code>/specs</code> (reserva atômica, pagamento idempotente, ingresso com QR), escritas antes do código. As regras dos agentes estão versionadas em <code>.claude/CLAUDE.md</code>. O código foi gerado com apoio do Claude Code e revisado pelo grupo; os testes de integração e o smoke serviram de contrapeso e acharam defeitos reais, descritos abaixo.</li>
+  <li><b>Ferramentas efetivamente usadas:</b> Java 21, Spring Boot 3.5, Maven, Testcontainers, PIT, GitHub Actions, Docker Compose, Keycloak. Figma, GitHub Projects e Structurizr continuam previstos para os próximos pacotes.</li>
+  <li><b>Escopo:</b> a SPA e os mockups do Pacote 1 não foram implementados neste checkpoint (decisão do grupo: só APIs).</li>
+</ul>
+<h2>5.1 Defeitos achados pelos testes e corrigidos</h2>
+<ul>
+  <li><b>Chave de idempotência reutilizada após falha do gateway:</b> o pagamento falho mantinha a chave e a nova tentativa violava a unicidade (achado em <code>CheckoutIT</code>).</li>
+  <li><b>Erros 409, 422 e 404 virando 403:</b> o redirecionamento para <code>/error</code> caía na regra de negação do Spring Security. Os testes com MockMvc não veem isso; o smoke contra o Compose real encontrou.</li>
+  <li><b>Tópico criado com 1 partição:</b> corrida de criação de tópicos entre serviços; corrigida com o contêiner <code>kafka-init</code> e criação automática desligada.</li>
+  <li><b>Limite do segredo do QR:</b> mutante sobrevivente (32 contra 31 caracteres) fechado com teste de fronteira.</li>
+</ul>
+</div>
+
+<div class="section"><h1>6. Atualizações do Pacote 2</h1>
+<p>O documento do Pacote 2 foi regenerado como <code>PulsePass_Pacote2_atualizado.pdf</code>, com a nova seção 8 (atualizações do Pacote 3) e a tabela de divergências da seção 3 deste documento. O arquivo originalmente entregue foi mantido como <code>PulsePass_Pacote2_entregue.pdf</code>.</p>
+<p>O Pacote 1 original não tem fonte editável neste repositório, por isso ele é mantido como entregue (<code>PulsePass_Pacote1_entregue.pdf</code>) e suas atualizações estão na seção 5 deste documento.</p>
+
+<h1>7. Próximos passos (Pacote 4)</h1>
+<ul>
+  <li>SPA responsiva (catálogo, mapa de assentos, checkout, meus ingressos, leitor de QR) e acessibilidade (RNF21, RNF22).</li>
+  <li><code>iam-service</code>, <code>telemetria-service</code> e <code>realtime-service</code>; e-mail com Mailpit; fila virtual (RNF23).</li>
+  <li>Observabilidade com OpenTelemetry, Prometheus e Grafana (RNF16); correlation-id.</li>
+  <li>Testes de carga (k6) e de réplicas; teste derrubando o emissao-service; verificação da CI no GitHub.</li>
+  <li>Auto-cadastro de clientes no Keycloak (US01) e publicação de eventos (US10).</li>
+</ul></div>
+</body></html>

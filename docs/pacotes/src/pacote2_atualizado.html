@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>PulsePass – Pacote 2 (atualizado)</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm;
+    @bottom-center { content: "PulsePass · Pacote 2 · " counter(page); font: 9pt Helvetica, Arial, sans-serif; color: #666; } }
+  @page wide { size: A4 landscape; margin: 14mm 12mm;
+    @bottom-center { content: "PulsePass · Pacote 2 · " counter(page); font: 9pt Helvetica, Arial, sans-serif; color: #666; } }
+  @page cover { margin: 0; @bottom-center { content: none; } }
+  * { box-sizing: border-box; }
+  body { font: 10pt/1.4 Helvetica, Arial, sans-serif; color: #1b1b1b; margin: 0; }
+  h1 { font-size: 17pt; color: #12305a; border-bottom: 2px solid #e8731a; padding-bottom: 4px; margin: 0 0 10px; break-after: avoid; }
+  h2 { font-size: 13pt; color: #12305a; margin: 18px 0 6px; break-after: avoid; }
+  h3 { font-size: 11pt; color: #333; margin: 14px 0 4px; break-after: avoid; }
+  p { margin: 5px 0; }
+  ul, ol { margin: 4px 0 6px 18px; padding: 0; }
+  li { margin: 2px 0; }
+  code { font: 9pt Menlo, Consolas, monospace; background: #f1f3f6; padding: 0 3px; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 8.8pt; break-inside: auto; }
+  th { background: #12305a; color: #fff; text-align: left; padding: 4px 6px; }
+  td { border: 1px solid #cfd6df; padding: 3px 6px; vertical-align: top; }
+  tr { break-inside: avoid; }
+  tr:nth-child(even) td { background: #f6f8fb; }
+  .section { break-before: page; }
+  .box { background: #fff4e8; border-left: 4px solid #e8731a; padding: 6px 10px; margin: 8px 0; font-size: 9.5pt; }
+  .fig { margin: 10px 0; text-align: center; break-inside: avoid; }
+  .fig .cap { font-size: 9pt; color: #555; margin-top: 3px; }
+  .fig svg { width: auto !important; height: auto !important; max-width: 100% !important; max-height: 190mm; }
+  .wide { page: wide; break-before: page; }
+  .wide .fig svg { max-height: 128mm; }
+  .fig.sm svg { max-height: 105mm; }
+  .cover { page: cover; height: 297mm; padding: 60mm 24mm 24mm; background: #12305a; color: #fff; break-after: page; }
+  .cover small { letter-spacing: .08em; color: #f4b27a; }
+  .cover h1 { color: #fff; font-size: 46pt; border: 0; margin: 14mm 0 2mm; }
+  .cover h2 { color: #fff; font-size: 17pt; font-weight: normal; margin: 0 0 18mm; }
+  .cover p { font-size: 11pt; margin: 3px 0; }
+  .toc li { margin: 3px 0; }
+  pre { font: 8.5pt/1.35 Menlo, Consolas, monospace; background: #f1f3f6; padding: 8px 10px; border-radius: 4px; break-inside: avoid; margin: 6px 0; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <p>PONTIFÍCIA UNIVERSIDADE CATÓLICA DO RIO GRANDE DO SUL<br>ESCOLA POLITÉCNICA<br>46504-04 · Construção de Software · Turma 330 · 2026/2<br>Prof. Michael da Costa Mora</p>
+  <p style="margin-top:14mm"><small>PROJETO INTEGRADOR · PACOTE 2</small></p>
+  <h1>PulsePass</h1>
+  <h2>Arquitetura e Infraestrutura de Desenvolvimento</h2>
+  <p>Arquitetura C4 · Modelo de Dados Conceitual · Mensageria Kafka · Pipeline de Desenvolvimento · Gerenciamento da Configuração</p>
+  <p style="margin-top:22mm">Integrantes: Gabriel Kowaleski e Mayra Bordin</p>
+  <p>Entrega original: 4 de novembro de 2026</p>
+  <p><b>Versão atualizada para o Pacote 3</b> (ver seção 8)</p>
+</div>
+
+<h1>Sumário</h1>
+<ol class="toc">
+  <li><b>Visão geral e decisões arquiteturais</b> – premissas, stack, ADRs e rastreabilidade com os RNFs</li>
+  <li><b>Arquitetura no Modelo C4</b> – Nível 1 (Contexto), Nível 2 (Contêineres), Nível 3 (Componentes)</li>
+  <li><b>Modelo de Dados Conceitual</b> – entidades por serviço e relacionamentos entre serviços</li>
+  <li><b>Estrutura de Mensageria do Kafka</b> – tópicos, catálogo de eventos, chaves, consumidores, Outbox e idempotência</li>
+  <li><b>Pipeline de Desenvolvimento</b> – CI/CD, Docker Compose e portões de qualidade</li>
+  <li><b>Processo de Gerenciamento da Configuração de Software (GCS)</b> – ferramenta, branches e regras</li>
+  <li><b>Rastreabilidade com o enunciado</b></li>
+  <li><b>Atualizações do Pacote 3</b> – o que mudou entre o desenho e a implementação</li>
+</ol>
+
+<div class="section">
+<h1>1. Visão geral e decisões arquiteturais</h1>
+<p>Este documento detalha a arquitetura da plataforma PulsePass definida nos requisitos do Pacote 1 (histórias US01–US33 e requisitos não funcionais RNF01–RNF23). A solução é composta por microsserviços orientados a eventos, com um banco de dados por serviço, Kafka como barramento e comunicação síncrona apenas na borda (SPA → API Gateway → serviço) e nas chamadas ao gateway de pagamento simulado.</p>
+
+<h2>1.1 Premissas e stack</h2>
+<table>
+<thead><tr><th style="width:26%">Camada</th><th>Escolha</th><th style="width:34%">Motivo</th></tr></thead>
+<tr><td>Backend</td><td>Java 21, Spring Boot 3, Spring Cloud Gateway, Resilience4j, Maven</td><td>Alinhado ao conteúdo da disciplina (Spring Cloud, JUnit 5, Testcontainers, PIT).</td></tr>
+<tr><td>Frontend</td><td>SPA responsiva em TypeScript, servida por Nginx</td><td>RNF21/RNF22; sem aplicativo nativo (fora do escopo).</td></tr>
+<tr><td>Identidade</td><td>Keycloak (OIDC, JWT RS256)</td><td>RNF12; senhas existem somente no IdP (RNF15).</td></tr>
+<tr><td>Persistência</td><td>PostgreSQL 16, um banco lógico por serviço</td><td>Transações ACID para estados, Outbox e idempotência.</td></tr>
+<tr><td>Cache e coordenação</td><td>Redis 7</td><td>Cache do catálogo (RNF06), filtro de contenção de assentos e fila virtual (RNF23).</td></tr>
+<tr><td>Streaming</td><td>Apache Kafka (modo KRaft) e Kafka UI</td><td>Desacoplamento e reprocessamento (RNF04, RNF05, RNF11).</td></tr>
+<tr><td>Tempo real</td><td>WebSocket/STOMP em serviço dedicado</td><td>Mapa de assentos, status do pedido e painel (US14, US27, US32).</td></tr>
+<tr><td>Observabilidade</td><td>OpenTelemetry, Prometheus, Grafana, logs JSON com <code>correlation-id</code></td><td>RNF16.</td></tr>
+</table>
+
+<h2>1.2 Decisões arquiteturais (ADRs)</h2>
+<table>
+<thead><tr><th style="width:9%">ADR</th><th style="width:24%">Decisão</th><th>Justificativa e consequências</th></tr></thead>
+<tr><td>001</td><td>Banco de dados por serviço; nenhuma chave estrangeira entre serviços</td><td>Autonomia de implantação e escala. Referências entre serviços são apenas identificadores; a consistência é eventual e feita por eventos.</td></tr>
+<tr><td>002</td><td>Reserva de assento com <code>UPDATE</code> condicional no PostgreSQL como fonte da verdade, e Redis (<code>SET NX PX</code>) como filtro de contenção</td><td>Garante zero sobre-venda (RNF01) mesmo se o Redis falhar ou perder a chave: quem decide é a contagem de linhas afetadas por <code>UPDATE ... WHERE status = 'LIVRE'</code>. O Redis só reduz a carga no banco durante o pico. A capacidade de um lote segue a mesma regra, com contadores atualizados por <code>UPDATE</code> condicional.</td></tr>
+<tr><td>003</td><td>Transactional Outbox com publicador por polling (<code>FOR UPDATE SKIP LOCKED</code>)</td><td>Elimina a escrita dupla banco+Kafka (RNF04). Publicação é <i>at-least-once</i>. Alternativa futura: CDC com Debezium, sem mudar o contrato dos eventos.</td></tr>
+<tr><td>004</td><td>Consumidores idempotentes com tabela <code>evento_processado</code> gravada na mesma transação do efeito</td><td>Reprocessar um evento não duplica ingressos nem transições (RNF05).</td></tr>
+<tr><td>005</td><td>API Gateway (Spring Cloud Gateway) valida o JWT e aplica rate limit; os serviços revalidam o papel (RBAC)</td><td>Ponto único de entrada (RNF12, RNF13); defesa em profundidade.</td></tr>
+<tr><td>006</td><td><code>realtime-service</code> separado, sem estado e sem banco</td><td>Escala independente das conexões WebSocket (RNF09). Cada réplica usa um <i>consumer group</i> próprio para receber todos os eventos e entregar às suas sessões.</td></tr>
+<tr><td>007</td><td>Gateway de pagamento simulado como contêiner próprio, com aprovação, recusa e atraso configuráveis</td><td>Permite testar timeout, retentativa e circuit breaker (RNF10).</td></tr>
+<tr><td>008</td><td>Expiração de reserva executada pelo Inventário (worker agendado), com suspensão enquanto o pagamento estiver em curso</td><td>Evita expirar uma reserva cujo pagamento está sendo processado; a suspensão é limitada a 30 s, respeitando a tolerância do RNF02 (10 min + 30 s).</td></tr>
+</table>
+
+<h2>1.3 Rastreabilidade dos requisitos não funcionais</h2>
+<table>
+<thead><tr><th style="width:16%">RNF</th><th>Como a arquitetura atende</th></tr></thead>
+<tr><td>RNF01, RNF02</td><td>ADR-002 e ADR-008; reserva ativa com <code>expira_em</code>; worker de expiração e evento <code>ReservaExpirada</code>.</td></tr>
+<tr><td>RNF03</td><td>Filtro de <code>Idempotency-Key</code> e tabela <code>chave_idempotencia</code> no Checkout (seção 2.3.6).</td></tr>
+<tr><td>RNF04, RNF05</td><td>ADR-003 e ADR-004; seção 4.5.</td></tr>
+<tr><td>RNF06 a RNF08</td><td>Catálogo lido do cache Redis (RNF06); reserva com filtro Redis antes do banco (RNF07); emissão assíncrona, com o tempo entre <code>PedidoPago</code> e <code>IngressoEmitido</code> medido pelo telemetria-service (RNF08). Testes de carga com k6 ficam como bônus (seção 5.2).</td></tr>
+<tr><td>RNF09, RNF11</td><td>Serviços sem estado em memória; partições por chave; mensagens retidas no Kafka enquanto o emissao-service (emissão e notificações) estiver fora.</td></tr>
+<tr><td>RNF10</td><td><code>GatewayPagamentoClient</code> com timeout, retentativa com backoff e circuit breaker (Resilience4j).</td></tr>
+<tr><td>RNF12–RNF15</td><td>Keycloak, API Gateway, RBAC nos serviços, QR assinado pela Emissão e dados pessoais apenas no IdP (os serviços guardam somente <code>usuario_id</code>).</td></tr>
+<tr><td>RNF16</td><td>OpenTelemetry Collector, Prometheus e Grafana no Compose; <code>traceparent</code> propagado em HTTP e nos cabeçalhos Kafka.</td></tr>
+<tr><td>RNF17–RNF20</td><td>Pipeline e GCS (seções 5 e 6).</td></tr>
+<tr><td>RNF21–RNF23</td><td>SPA responsiva e acessível (contêiner SPA); fila virtual por ordem de chegada no Inventário (Figura 3 e seção 2.3.6).</td></tr>
+</table>
+
+<h2>1.4 Limitações assumidas</h2>
+<ul>
+  <li><b>Kafka com um único broker</b> no Compose (replicação 1); o desenho já parametriza o fator de replicação.</li>
+  <li><b>Pagamento simulado:</b> aprovação tardia após <i>timeout</i> é tratada como estorno simulado, sem integração real com adquirente.</li>
+  <li><b>Telemetria</b> aceita perda eventual de eventos de navegação (não críticos); eventos de domínio nunca se perdem, pelo Outbox.</li>
+  <li><b>Sem multirregião nem alta disponibilidade do PostgreSQL</b>: fora do escopo do projeto acadêmico.</li>
+</ul>
+</div>
+
+<div class="section">
+<h1>2. Arquitetura no Modelo C4</h1>
+<p>A arquitetura é descrita em três níveis. Os diagramas usam a notação C4 (pessoa, sistema, contêiner, componente), com tecnologia entre colchetes. Linhas tracejadas indicam comunicação assíncrona, indireta ou de telemetria.</p>
+
+<h2>2.1 Nível 1 – Diagrama de Contexto</h2>
+<p>O PulsePass atende quatro perfis de usuário e depende de dois sistemas externos. As fronteiras do software são: tudo o que o grupo constrói e implanta está dentro do sistema PulsePass; o gateway de pagamento (simulado) e o serviço de e-mail ficam fora.</p>
+<div class="fig">
+<script type="text/mermaid">
+flowchart TB
+  cli["<b>Cliente</b><br/>[Pessoa]<br/>Compra ingressos, reserva assentos e baixa o ingresso"]:::person
+  org["<b>Organizador</b><br/>[Pessoa]<br/>Cadastra eventos, lotes e mapas de assentos e acompanha as vendas"]:::person
+  ope["<b>Operador</b><br/>[Pessoa]<br/>Valida QR Codes na portaria"]:::person
+  adm["<b>Administrador</b><br/>[Pessoa]<br/>Aprova organizadores, audita acessos e monitora a saúde"]:::person
+  pp["<b>PulsePass</b><br/>[Sistema de software]<br/>Plataforma distribuída de bilhetagem, reserva e acesso para megaeventos"]:::system
+  gw["<b>Gateway de pagamento</b><br/>[Sistema externo - simulado]<br/>Aprova, recusa ou atrasa cobranças"]:::ext
+  em["<b>Serviço de e-mail</b><br/>[Sistema externo]<br/>Entrega comprovantes e ingressos"]:::ext
+  cli -->|"Reserva, paga e consulta ingressos<br/>[HTTPS, WebSocket]"| pp
+  org -->|"Gerencia eventos e vê painel de vendas<br/>[HTTPS, WebSocket]"| pp
+  ope -->|"Lê QR Code e recebe resultado<br/>[HTTPS]"| pp
+  adm -->|"Gerencia papéis e acompanha métricas<br/>[HTTPS]"| pp
+  pp -->|"Solicita cobrança<br/>[HTTPS REST]"| gw
+  pp -->|"Envia ingresso e comprovante<br/>[SMTP]"| em
+  em -.->|"Entrega mensagem"| cli
+  classDef person fill:#12305a,stroke:#0b1f3a,color:#fff
+  classDef system fill:#e8731a,stroke:#b4560f,color:#fff
+  classDef ext fill:#8a94a3,stroke:#5d6673,color:#fff
+</script>
+<div class="cap">Figura 1 – C4 Nível 1: contexto do PulsePass.</div>
+</div>
+
+<div class="wide">
+<h2>2.2 Nível 2 – Diagrama de Contêineres</h2>
+<p>Distribuição física: SPA, API Gateway, Keycloak, cinco serviços de negócio, o serviço de tempo real, bancos, Redis, cluster Kafka e a stack de observabilidade. Em desenvolvimento, todos sobem por <code>docker compose up</code>; os cinco bancos lógicos podem residir em uma única instância PostgreSQL.</p>
+<div class="fig">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" class="c4"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs><style>.t{font:bold 14px Helvetica,Arial,sans-serif;fill:#fff;text-anchor:middle}
+.s{font:11.5px Helvetica,Arial,sans-serif;fill:#fff;text-anchor:middle;opacity:.95}
+.l{font:11.5px Helvetica,Arial,sans-serif;fill:#222;paint-order:stroke;stroke:#fff;stroke-width:3px}
+.bl{font:bold 12px Helvetica,Arial,sans-serif;fill:#44566f}
+.ln{fill:none;stroke:#333;stroke-width:1.6}
+.person{fill:#12305a;stroke:#0b1f3a}.cont{fill:#2f6db5;stroke:#1d4c82}.db{fill:#5b8fd1;stroke:#2f6db5}
+.bus{fill:#e8731a;stroke:#b4560f}.ext{fill:#8a94a3;stroke:#5d6673}
+.bound{fill:#f4f7fc;stroke:#9fb3d1;stroke-dasharray:8 5}.grp{fill:#e9eff9;stroke:#9fb3d1}.leg{fill:#fff;stroke:#c8d2e0}</style><rect x="20" y="95" width="1160" height="470" rx="10" class="bound"/>
+<text x="1166" y="118" class="bl" text-anchor="end">Fronteira do sistema PulsePass</text>
+<rect x="50" y="240" width="1050" height="135" rx="8" class="grp"/>
+<text x="64" y="259" class="bl">Microsserviços de negócio · Java 21, Spring Boot · um banco lógico por serviço</text>
+<rect x="35" y="10" width="220" height="56" rx="7" class="person"/>
+<text x="145.0" y="35.0" class="t">Usuários</text>
+<text x="145.0" y="51.0" class="s">Cliente, Organizador, Operador, Admin</text>
+<rect x="60" y="135" width="170" height="70" rx="7" class="cont"/>
+<text x="145.0" y="167.0" class="t">SPA</text>
+<text x="145.0" y="183.0" class="s">TypeScript, Nginx</text>
+<rect x="300" y="135" width="190" height="70" rx="7" class="cont"/>
+<text x="395.0" y="159.0" class="t">API Gateway</text>
+<text x="395.0" y="175.0" class="s">Spring Cloud Gateway</text>
+<text x="395.0" y="191.0" class="s">valida JWT, rate limit</text>
+<rect x="560" y="135" width="160" height="70" rx="7" class="cont"/>
+<text x="640.0" y="159.0" class="t">Keycloak</text>
+<text x="640.0" y="175.0" class="s">IdP OIDC</text>
+<text x="640.0" y="191.0" class="s">JWT, refresh, papéis</text>
+<rect x="60" y="278" width="190" height="80" rx="7" class="cont"/>
+<text x="155.0" y="315.0" class="t">iam-service</text>
+<text x="155.0" y="331.0" class="s">cadastro e auditoria</text>
+<rect x="270" y="278" width="190" height="80" rx="7" class="cont"/>
+<text x="365.0" y="315.0" class="t">inventario-service</text>
+<text x="365.0" y="331.0" class="s">eventos, assentos, reservas</text>
+<rect x="480" y="278" width="190" height="80" rx="7" class="cont"/>
+<text x="575.0" y="315.0" class="t">checkout-service</text>
+<text x="575.0" y="331.0" class="s">pedido e pagamento</text>
+<rect x="690" y="278" width="190" height="80" rx="7" class="cont"/>
+<text x="785.0" y="315.0" class="t">emissao-service</text>
+<text x="785.0" y="331.0" class="s">ingresso, e-mail, validação</text>
+<rect x="900" y="278" width="190" height="80" rx="7" class="cont"/>
+<text x="995.0" y="315.0" class="t">telemetria-service</text>
+<text x="995.0" y="331.0" class="s">ingestão e métricas</text>
+<path d="M60,439 v62 a95.0,9 0 0 0 190,0 v-62 a95.0,9 0 0 0 -190,0 a95.0,9 0 0 0 190,0" class="db"/>
+<text x="155.0" y="471.0" class="t">PostgreSQL</text>
+<text x="155.0" y="487.0" class="s">um banco por serviço</text>
+<path d="M270,439 v62 a85.0,9 0 0 0 170,0 v-62 a85.0,9 0 0 0 -170,0 a85.0,9 0 0 0 170,0" class="db"/>
+<text x="355.0" y="471.0" class="t">Redis</text>
+<text x="355.0" y="487.0" class="s">cache, locks, fila</text>
+<polygon points="578,430 682,430 700,470.0 682,510 578,510 560,470.0" class="bus"/>
+<text x="630.0" y="467.0" class="t">Cluster Kafka</text>
+<text x="630.0" y="483.0" class="s">KRaft + Kafka UI</text>
+<rect x="760" y="430" width="160" height="80" rx="7" class="cont"/>
+<text x="840.0" y="467.0" class="t">realtime-service</text>
+<text x="840.0" y="483.0" class="s">WebSocket</text>
+<rect x="940" y="430" width="170" height="80" rx="7" class="cont"/>
+<text x="1025.0" y="459.0" class="t">Observabilidade</text>
+<text x="1025.0" y="475.0" class="s">OTel, Prometheus,</text>
+<text x="1025.0" y="491.0" class="s">Grafana</text>
+<rect x="430" y="620" width="220" height="60" rx="7" class="ext"/>
+<text x="540.0" y="647.0" class="t">Gateway de pagamento</text>
+<text x="540.0" y="663.0" class="s">sistema externo, simulado</text>
+<rect x="680" y="620" width="220" height="60" rx="7" class="ext"/>
+<text x="790.0" y="647.0" class="t">Servidor SMTP</text>
+<text x="790.0" y="663.0" class="s">Mailpit em desenvolvimento</text>
+<path d="M145,66 V135" class="ln" marker-end="url(#a)"/>
+<text x="155" y="88" class="l" text-anchor="start">HTTPS</text>
+<path d="M230,170 H300" class="ln" marker-end="url(#a)"/>
+<text x="265" y="163" class="l" text-anchor="middle">REST+JWT</text>
+<path d="M200,135 C200,108 640,108 640,135" class="ln" marker-end="url(#a)"/>
+<text x="420" y="104" class="l" text-anchor="middle">OIDC</text>
+<path d="M490,170 H560" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="525" y="163" class="l" text-anchor="middle">JWKS</text>
+<path d="M395,205 V240" class="ln" marker-end="url(#a)"/>
+<text x="405" y="226" class="l" text-anchor="start">REST</text>
+<path d="M155,375 V430" class="ln" marker-end="url(#a)"/>
+<text x="165" y="408" class="l" text-anchor="start">SQL</text>
+<path d="M355,375 V430" class="ln" marker-end="url(#a)"/>
+<text x="365" y="408" class="l" text-anchor="start">Inventário</text>
+<path d="M630,375 V430" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="640" y="408" class="l" text-anchor="start">publica e consome</text>
+<path d="M1025,375 V430" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1035" y="408" class="l" text-anchor="start">métricas e traces</text>
+<path d="M760,470 H700" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="730" y="462" class="l" text-anchor="middle">consome</text>
+<path d="M60,185 H36 V535 H840 V510" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="300" y="528" class="l" text-anchor="middle">WebSocket (SPA ⇄ realtime-service)</text>
+<path d="M520,358 V620" class="ln" marker-end="url(#a)"/>
+<text x="528" y="600" class="l" text-anchor="start">Checkout: HTTPS</text>
+<path d="M730,358 V620" class="ln" marker-end="url(#a)"/>
+<text x="738" y="600" class="l" text-anchor="start">Emissão: SMTP</text>
+<rect x="770" y="128" width="395" height="84" rx="6" class="leg"/>
+<line x1="785" y1="150" x2="835" y2="150" class="ln" marker-end="url(#a)"/><text x="845" y="154" class="l" text-anchor="start">comunicação síncrona (HTTP, SQL)</text>
+<line x1="785" y1="172" x2="835" y2="172" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/><text x="845" y="176" class="l" text-anchor="start">comunicação assíncrona ou de telemetria</text>
+<text x="785" y="198" class="l" text-anchor="start">Cada serviço acessa somente o seu banco lógico.</text></svg>
+<div class="cap">Figura 2 – C4 Nível 2: contêineres. Linhas tracejadas: comunicação assíncrona ou de telemetria. Fronteira tracejada: tudo o que o grupo implanta (ADR-001).</div>
+</div>
+</div>
+
+<h3>Responsabilidades dos contêineres</h3>
+<table>
+<thead><tr><th style="width:20%">Contêiner</th><th>Responsabilidade</th><th style="width:26%">Dados e histórias</th></tr></thead>
+<tr><td>SPA</td><td>Catálogo, mapa de assentos, checkout com contagem regressiva sincronizada pelo servidor, meus ingressos, painéis e leitor de QR.</td><td>US11–US14, US19, US26, US28</td></tr>
+<tr><td>API Gateway</td><td>Entrada única; valida assinatura e expiração do JWT (401); roteia por prefixo; rate limit por IP e por usuário.</td><td>RNF12</td></tr>
+<tr><td>Keycloak</td><td>Cadastro, login, emissão de access token (15 min) e refresh token (7 dias), papéis Cliente, Organizador, Operador e Admin.</td><td>US01–US04</td></tr>
+<tr><td>iam-service</td><td>Cadastro e aprovação de organizadores (altera papéis pela Admin API do Keycloak); trilha de auditoria de credenciais, alimentada por eventos do Keycloak.</td><td>US05, US06</td></tr>
+<tr><td>inventario-service</td><td>Eventos, lotes e mapas; catálogo com cache Redis; reserva atômica, cancelamento e expiração; fila virtual.</td><td>US07–US18</td></tr>
+<tr><td>checkout-service</td><td>Máquina de estados do pedido; pagamento idempotente; cliente do gateway com resiliência; Outbox.</td><td>US19–US23</td></tr>
+<tr><td>emissao-service</td><td>Consumo de <code>PedidoPago</code>; ingresso em PDF com QR assinado e carimbo de tempo; e-mail; validação na portaria.</td><td>US24–US29</td></tr>
+<tr><td>telemetria-service</td><td>Ingestão de eventos de navegação e compra; agregação por janela; métricas operacionais.</td><td>US31–US33</td></tr>
+<tr><td>realtime-service</td><td>Mantém sessões WebSocket autenticadas (valida o JWT no handshake, pelo JWKS do Keycloak) e entrega atualizações vindas do Kafka (assentos, pedido, painel), filtrando mensagens de pedido e ingresso pelo <code>clienteId</code> do usuário.</td><td>US14, US27, US32</td></tr>
+</table>
+
+<h2>2.3 Nível 3 – Diagramas de Componentes</h2>
+<p>Os cinco serviços de negócio são detalhados abaixo, começando pelos de maior complexidade técnica (Inventário, Checkout e Emissão). Todos seguem a mesma divisão em camadas: <b>controladores de borda</b> (REST), <b>casos de uso</b> (aplicação), <b>domínio</b> (regras e máquinas de estado, sem dependência de framework), <b>repositórios e adaptadores</b> (JPA, Redis, HTTP, SMTP), <b>workers do Outbox</b> e <b>consumidores de mensageria</b>.</p>
+
+<div class="wide">
+<h3>2.3.1 inventario-service</h3>
+<div class="fig">
+<script type="text/mermaid">
+flowchart TB
+  c1["<b>CatalogoController</b><br/>GET eventos, lotes, assentos"]:::ctrl
+  c2["<b>ReservaController</b><br/>POST e DELETE reservas"]:::ctrl
+  c3["<b>EventoAdminController</b><br/>CRUD de eventos e lotes"]:::ctrl
+  c4["<b>FilaController</b><br/>entrar e consultar posição"]:::ctrl
+  u7["<b>GerirFilaVirtual</b>"]:::uc
+  u1["<b>ConsultarCatalogo</b>"]:::uc
+  u2["<b>ReservarAssentos</b>"]:::uc
+  u3["<b>CancelarReserva</b>"]:::uc
+  u6["<b>GerirEvento</b>"]:::uc
+  u4["<b>ExpirarReservas</b>"]:::uc
+  u5["<b>ConfirmarVenda</b>"]:::uc
+  d1["<b>Reserva</b><br/>ATIVA, CONFIRMADA,<br/>EXPIRADA, CANCELADA"]:::dom
+  d2["<b>Assento</b><br/>LIVRE, RESERVADO, VENDIDO"]:::dom
+  rp["<b>Repositórios JPA</b><br/>Assento, Reserva, Evento, Outbox<br/>UPDATE condicional"]:::adp
+  rc["<b>CatalogoCache, SeatLock e FilaVirtual</b><br/>Redis: cache, SET NX PX, ZSET"]:::adp
+  w1["<b>ExpiracaoWorker</b><br/>agendado, SKIP LOCKED"]:::worker
+  k1["<b>PedidoEventsConsumer</b><br/>PedidoPago, PedidoAguardando<br/>+ deduplicação"]:::worker
+  w2["<b>OutboxRelayWorker</b><br/>polling e publicação"]:::worker
+  pg[("db_inventario<br/>PostgreSQL")]:::infra
+  rd[("Redis")]:::infra
+  kf{{"Kafka"}}:::infra
+  c1 --> u1
+  c2 --> u2 & u3
+  c3 --> u6
+  c4 --> u7
+  u7 --> rc
+  w1 --> u4
+  k1 --> u5
+  u1 --> rc
+  u2 --> rc
+  u2 --> d1
+  u3 --> d1
+  u4 --> d1
+  u5 --> d2
+  u2 & u3 & u4 & u5 & u6 & u1 --> rp
+  rp --> pg
+  rc --> rd
+  w2 --> pg
+  w2 -.->|"publica"| kf
+  kf -.->|"consome"| k1
+
+  classDef ctrl fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef uc fill:#6a9bd6,stroke:#2f6db5,color:#fff
+  classDef dom fill:#1f8a5b,stroke:#136040,color:#fff
+  classDef adp fill:#7a8699,stroke:#515c6d,color:#fff
+  classDef worker fill:#c2561a,stroke:#8d3c10,color:#fff
+  classDef infra fill:#e8731a,stroke:#b4560f,color:#fff
+  classDef ext fill:#8a94a3,stroke:#5d6673,color:#fff
+</script>
+<div class="cap">Figura 3 – C4 Nível 3: componentes do inventario-service. Cores: azul, controladores de borda; azul claro, casos de uso; verde, domínio; cinza, adaptadores; laranja escuro, workers e consumidores; laranja, infraestrutura. Em todos, o <code>JwtAuthFilter</code> (resource server do Keycloak) protege os controladores com RBAC.</div>
+</div>
+</div>
+
+<div class="wide">
+<h3>2.3.2 checkout-service</h3>
+<div class="fig">
+<script type="text/mermaid">
+flowchart TB
+  c1["<b>PedidoController</b><br/>POST e GET pedidos"]:::ctrl
+  c2["<b>PagamentoController</b><br/>POST pagamentos<br/>+ IdempotencyFilter"]:::ctrl
+  u1["<b>AbrirPedido</b>"]:::uc
+  u2["<b>ProcessarPagamento</b>"]:::uc
+  u3["<b>AplicarEventoDeReserva</b>"]:::uc
+  u4["<b>ExpirarPedido</b>"]:::uc
+  d1["<b>Pedido</b><br/>CRIADO, RESERVADO, AGUARDANDO,<br/>PAGO, EXPIRADO"]:::dom
+  d2["<b>Pagamento</b><br/>PENDENTE, APROVADO, RECUSADO"]:::dom
+  rp["<b>Repositórios JPA</b><br/>Pedido, Pagamento, Idempotência,<br/>ReservaRef (projeção), Outbox"]:::adp
+  gwc["<b>GatewayPagamentoClient</b><br/>timeout, retry com backoff,<br/>circuit breaker"]:::adp
+  k1["<b>ReservaEventsConsumer</b><br/>ReservaCriada, Expirada, Cancelada<br/>+ deduplicação"]:::worker
+  w2["<b>OutboxRelayWorker</b><br/>polling e publicação"]:::worker
+  pg[("db_checkout<br/>PostgreSQL")]:::infra
+  pay["Gateway de pagamento<br/>simulado"]:::ext
+  kf{{"Kafka"}}:::infra
+  c1 --> u1
+  c2 --> u2
+  k1 --> u3
+  u3 --> u4
+  u1 --> d1
+  u2 --> d1
+  u2 --> d2
+  u3 --> d1
+  u4 --> d1
+  u1 & u2 & u3 & u4 --> rp
+  u2 --> gwc
+  rp --> pg
+  gwc -->|"HTTPS"| pay
+  w2 --> pg
+  w2 -.->|"publica"| kf
+  kf -.->|"consome"| k1
+
+  classDef ctrl fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef uc fill:#6a9bd6,stroke:#2f6db5,color:#fff
+  classDef dom fill:#1f8a5b,stroke:#136040,color:#fff
+  classDef adp fill:#7a8699,stroke:#515c6d,color:#fff
+  classDef worker fill:#c2561a,stroke:#8d3c10,color:#fff
+  classDef infra fill:#e8731a,stroke:#b4560f,color:#fff
+  classDef ext fill:#8a94a3,stroke:#5d6673,color:#fff
+</script>
+<div class="cap">Figura 4 – C4 Nível 3: componentes do checkout-service (mesma legenda de cores da Figura 3).</div>
+</div>
+</div>
+
+<div class="wide">
+<h3>2.3.3 emissao-service</h3>
+<div class="fig">
+<script type="text/mermaid">
+flowchart TB
+  c1["<b>IngressoController</b><br/>meus ingressos, PDF"]:::ctrl
+  c2["<b>ValidacaoController</b><br/>validar QR - Operador"]:::ctrl
+  u4["<b>ConsultarIngressos</b>"]:::uc
+  u1["<b>EmitirIngresso</b>"]:::uc
+  u3["<b>ValidarIngresso</b>"]:::uc
+  u2["<b>EnviarComprovante</b>"]:::uc
+  d1["<b>Ingresso</b><br/>EMITIDO, UTILIZADO, CANCELADO"]:::dom
+  d2["<b>QrAssinador</b><br/>assinatura do identificador"]:::dom
+  rp["<b>Repositórios JPA</b><br/>Ingresso, Validação, Notificação, Outbox<br/>UPDATE condicional"]:::adp
+  pdf["<b>PdfGenerator</b><br/>carimbo de tempo e QR"]:::adp
+  em["<b>EmailSender</b><br/>SMTP com retentativa"]:::adp
+  k1["<b>PedidoPagoConsumer</b><br/>+ deduplicação"]:::worker
+  wn["<b>NotificacaoWorker</b><br/>reenvia pendentes"]:::worker
+  w2["<b>OutboxRelayWorker</b><br/>polling e publicação"]:::worker
+  pg[("db_emissao<br/>PostgreSQL")]:::infra
+  smtp["Servidor SMTP"]:::ext
+  kf{{"Kafka"}}:::infra
+  c1 --> u4
+  c2 --> u3
+  k1 --> u1
+  wn --> u2
+  u1 --> d1
+  u1 --> d2
+  u3 --> d1
+  u3 --> d2
+  u1 --> pdf
+  u2 --> em
+  u1 & u2 & u3 & u4 --> rp
+  rp --> pg
+  em -->|"SMTP"| smtp
+  w2 --> pg
+  w2 -.->|"publica"| kf
+  kf -.->|"consome"| k1
+
+  classDef ctrl fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef uc fill:#6a9bd6,stroke:#2f6db5,color:#fff
+  classDef dom fill:#1f8a5b,stroke:#136040,color:#fff
+  classDef adp fill:#7a8699,stroke:#515c6d,color:#fff
+  classDef worker fill:#c2561a,stroke:#8d3c10,color:#fff
+  classDef infra fill:#e8731a,stroke:#b4560f,color:#fff
+  classDef ext fill:#8a94a3,stroke:#5d6673,color:#fff
+</script>
+<div class="cap">Figura 5 – C4 Nível 3: componentes do emissao-service (mesma legenda de cores da Figura 3).</div>
+</div>
+</div>
+
+<div class="wide">
+<h3>2.3.4 iam-service</h3>
+<div class="fig">
+<script type="text/mermaid">
+flowchart TB
+  c1["<b>OrganizadorController</b><br/>solicitar, aprovar, rejeitar"]:::ctrl
+  c2["<b>AuditoriaController</b><br/>consulta - Admin"]:::ctrl
+  u1["<b>SolicitarCadastro</b>"]:::uc
+  u2["<b>DecidirCadastro</b>"]:::uc
+  u3["<b>RegistrarAuditoria</b>"]:::uc
+  u4["<b>ConsultarAuditoria</b>"]:::uc
+  d1["<b>CadastroOrganizador</b><br/>PENDENTE, APROVADO, REJEITADO"]:::dom
+  kca["<b>KeycloakAdminClient</b><br/>atribui o papel Organizador"]:::adp
+  rp["<b>Repositórios JPA</b><br/>Cadastro, Auditoria, Outbox"]:::adp
+  l1["<b>KeycloakEventListener</b><br/>eventos de login e credenciais<br/>+ deduplicação"]:::worker
+  w2["<b>OutboxRelayWorker</b><br/>polling e publicação"]:::worker
+  kc["Keycloak<br/>IdP OIDC"]:::ext
+  pg[("db_iam<br/>PostgreSQL")]:::infra
+  kf{{"Kafka"}}:::infra
+  c1 --> u1 & u2
+  c2 --> u4
+  l1 --> u3
+  u1 --> d1
+  u2 --> d1
+  u2 --> kca
+  u1 & u2 & u3 & u4 --> rp
+  kca -->|"Admin API"| kc
+  kc -.->|"eventos de autenticação"| l1
+  rp --> pg
+  w2 --> pg
+  w2 -.->|"publica iam.auditoria.v1"| kf
+
+  classDef ctrl fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef uc fill:#6a9bd6,stroke:#2f6db5,color:#fff
+  classDef dom fill:#1f8a5b,stroke:#136040,color:#fff
+  classDef adp fill:#7a8699,stroke:#515c6d,color:#fff
+  classDef worker fill:#c2561a,stroke:#8d3c10,color:#fff
+  classDef infra fill:#e8731a,stroke:#b4560f,color:#fff
+  classDef ext fill:#8a94a3,stroke:#5d6673,color:#fff
+</script>
+<div class="cap">Figura 6 – C4 Nível 3: componentes do iam-service (mesma legenda de cores da Figura 3).</div>
+</div>
+</div>
+
+<div class="wide">
+<h3>2.3.5 telemetria-service</h3>
+<div class="fig">
+<script type="text/mermaid">
+flowchart TB
+  c1["<b>IngestaoController</b><br/>eventos de navegação em lote"]:::ctrl
+  c2["<b>MetricasController</b><br/>painel e consultas"]:::ctrl
+  u1["<b>IngerirNavegacao</b>"]:::uc
+  u2["<b>ConsultarMetricas</b>"]:::uc
+  u3["<b>RegistrarEvento</b>"]:::uc
+  u4["<b>AgregarMetricas</b>"]:::uc
+  d1["<b>MetricaAgregada</b><br/>janela de 1 min por evento"]:::dom
+  pr["<b>NavegacaoProducer</b><br/>publica sem gravar no banco"]:::adp
+  rp["<b>Repositórios JPA</b><br/>EventoTelemetria, MetricaAgregada, Outbox"]:::adp
+  k1["<b>NavegacaoConsumer</b><br/>telemetria.navegacao.v1<br/>+ deduplicação"]:::worker
+  k2["<b>DominioEventsConsumer</b><br/>reserva, assento, pedido,<br/>ingresso, auditoria<br/>+ deduplicação"]:::worker
+  w1["<b>AgregadorWorker</b><br/>agendado, janelas de 1 min"]:::worker
+  w2["<b>OutboxRelayWorker</b><br/>polling e publicação"]:::worker
+  pg[("db_telemetria<br/>PostgreSQL")]:::infra
+  kf{{"Kafka"}}:::infra
+  c1 --> u1 --> pr
+  c2 --> u2
+  k1 --> u3
+  k2 --> u3
+  w1 --> u4
+  u4 --> d1
+  u2 & u3 & u4 --> rp
+  rp --> pg
+  w2 --> pg
+  pr -.->|"publica"| kf
+  w2 -.->|"publica telemetria.metrica.v1"| kf
+  kf -.->|"consome"| k1
+  kf -.->|"consome"| k2
+
+  classDef ctrl fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef uc fill:#6a9bd6,stroke:#2f6db5,color:#fff
+  classDef dom fill:#1f8a5b,stroke:#136040,color:#fff
+  classDef adp fill:#7a8699,stroke:#515c6d,color:#fff
+  classDef worker fill:#c2561a,stroke:#8d3c10,color:#fff
+  classDef infra fill:#e8731a,stroke:#b4560f,color:#fff
+  classDef ext fill:#8a94a3,stroke:#5d6673,color:#fff
+</script>
+<div class="cap">Figura 7 – C4 Nível 3: componentes do telemetria-service (mesma legenda de cores da Figura 3).</div>
+</div>
+</div>
+
+<h3>2.3.6 Comportamento dos componentes críticos</h3>
+<p><b>Fluxo crítico de <code>ReservarAssentos</code> (US15).</b> (1) tenta <code>SET NX PX</code> no Redis para cada assento, descartando rápido quem perdeu a disputa; (2) abre a transação e executa <code>UPDATE assento SET status='RESERVADO' WHERE id=? AND status='LIVRE'</code>; se alguma contagem for 0, desfaz tudo, libera as chaves do Redis e responde HTTP 409; (3) cria a <code>reserva</code> ATIVA com <code>expira_em = agora + 10 min</code> e grava <code>ReservaCriada</code> e <code>AssentoReservado</code> no Outbox, na mesma transação; (4) após o commit, o relay publica. Para lotes sem assento marcado, o passo (2) é <code>UPDATE lote SET qtd_reservada = qtd_reservada + :n WHERE id=? AND qtd_reservada + qtd_vendida + :n &lt;= quantidade</code>, com a mesma regra de contagem de linhas afetadas; expiração e cancelamento devolvem as unidades, e <code>PedidoPago</code> converte <code>qtd_reservada</code> em <code>qtd_vendida</code>. O <code>ExpiracaoWorker</code> seleciona reservas vencidas com <code>FOR UPDATE SKIP LOCKED</code>, libera os assentos e grava <code>ReservaExpirada</code> no Outbox; ele ignora reservas cujo pedido está em pagamento por até 30 s (ADR-008).</p>
+
+<p><b>Máquina de estados do pedido.</b> <code>CRIADO</code>: pedido aberto na tela de revisão (<code>POST /pedidos</code> com <code>reservaId</code>, US19). <code>RESERVADO</code>: o Checkout confirmou, pela projeção alimentada por <code>ReservaCriada</code>, que a reserva está ativa; fixa o total e o <code>expira_em</code>. Se o evento ainda não chegou, o pedido permanece em <code>CRIADO</code> e avança quando chegar. <code>AGUARDANDO</code>: pagamento aceito e enviado ao gateway. <code>PAGO</code>: gateway aprovou. <code>EXPIRADO</code>: reserva expirada ou cancelada pelo cliente (o motivo é registrado). Se o gateway recusar o pagamento, o pedido volta a <code>RESERVADO</code> e o cliente pode tentar de novo enquanto a reserva estiver ativa (US23). O payload de <code>ReservaCriada</code> traz os itens (assento ou lote, quantidade e preço unitário), que o Checkout guarda em <code>RESERVA_REF</code> para fixar o total sem consulta síncrona. Transições inválidas lançam exceção de domínio e são cobertas pelos testes unitários (meta ≥ 70%).</p>
+<p><b>Pagamento idempotente (US21, RNF03).</b> O <code>IdempotencyFilter</code> procura a chave em <code>chave_idempotencia</code>. Se existir com o mesmo hash de requisição, devolve a resposta guardada, sem chamar o gateway; se o hash for diferente, responde 422. Se não existir: <b>TX1</b> insere a chave (índice único), o pagamento PENDENTE e move o pedido para AGUARDANDO; a chamada ao gateway ocorre <b>fora</b> de transação; <b>TX2</b> atualiza o pagamento e o pedido, grava <code>PedidoPago</code> (ou <code>PagamentoRecusado</code>) no Outbox e guarda a resposta na chave. O timeout do gateway (20 s) é menor que a suspensão da expiração (30 s, ADR-008): a resposta, aprovada ou recusada, chega antes de a reserva poder expirar. Se o gateway estourar o timeout, o pedido volta a RESERVADO; uma aprovação tardia vira estorno simulado (limitação registrada em 1.4).</p>
+
+<p><b>Emissão e validação.</b> <code>EmitirIngresso</code> deduplica pelo <code>event_id</code>, cria o ingresso, assina o identificador (<code>QrAssinador</code>, RNF14), gera o PDF com carimbo de tempo e grava <code>IngressoEmitido</code> no Outbox. O envio de e-mail é feito pelo <code>NotificacaoWorker</code>, fora do caminho crítico: falha de SMTP não impede a emissão (RNF11). <code>ValidarIngresso</code> verifica a assinatura e executa <code>UPDATE ingresso SET status='UTILIZADO' WHERE id=? AND status='EMITIDO'</code>; com 0 linhas afetadas responde "Ingresso já utilizado" com o horário da primeira leitura (US28, US29).</p>
+
+
+<p><b>Fila virtual (US18, RNF23).</b> Quando a demanda excede a capacidade configurada para o evento, o <code>FilaController</code> registra o cliente em um ZSET do Redis por evento, ordenado pelo instante de chegada. O cliente consulta sua posição e, quando chega a vez, recebe um token de acesso de curta duração, exigido por <code>POST /reservas</code>. A liberação segue a ordem de chegada, em lotes.</p>
+<p><b>Cadastro de organizador (US05, US06).</b> <code>SolicitarCadastro</code> grava o pedido como PENDENTE. <code>DecidirCadastro</code>, restrito ao Admin, chama a Admin API do Keycloak para atribuir o papel Organizador (operação idempotente) e só então confirma APROVADO no banco, junto com o registro de auditoria e o evento <code>OrganizadorAprovado</code> no Outbox. Se o Keycloak falhar, o cadastro continua PENDENTE e a decisão pode ser repetida.</p>
+<p><b>Telemetria (US31 a US33).</b> A SPA envia eventos de navegação em lote; o <code>NavegacaoProducer</code> os publica em <code>telemetria.navegacao.v1</code> sem gravar no banco, portanto sem escrita dupla. Os consumidores gravam <code>EVENTO_TELEMETRIA</code> com deduplicação por <code>eventId</code>; o <code>AgregadorWorker</code> calcula janelas de 1 min, grava <code>METRICA_AGREGADA</code> e o evento <code>MetricaAgregada</code> no Outbox, na mesma transação. Métricas operacionais (latência, erros, lag do Kafka) vêm do Prometheus e do Grafana.</p>
+</div>
+
+<div class="section">
+<h1>3. Modelo de Dados Conceitual</h1>
+<p>O modelo é conceitual: mostra entidades, atributos principais e relacionamentos, sem tipos físicos, índices ou particionamento. Em conformidade com a ADR-001, cada serviço é dono dos seus dados; <b>relacionamentos entre serviços aparecem como atributos de referência</b> (identificador) e não como chaves estrangeiras. Usuários, senhas e papéis residem somente no Keycloak (RNF15) e, nos demais serviços, aparecem apenas como <code>usuario_id</code> (o <code>sub</code> do JWT). Todo serviço que publica ou consome eventos (Inventário, Checkout, Emissão, IAM e Telemetria) mantém ainda duas tabelas técnicas, omitidas dos diagramas por serem iguais: <code>OUTBOX_EVENT</code> (<code>id</code>, <code>tipo</code>, <code>payload</code> JSON, <code>publicado_em</code>) e <code>EVENTO_PROCESSADO</code> (<code>event_id</code> como chave primária, <code>processado_em</code>).</p>
+
+<div class="wide">
+<h2>3.1 Visão integrada</h2>
+<p>A Figura 8 reúne as entidades principais de todos os serviços. Cada caixa maior é o banco de um serviço; setas contínuas são relações dentro do mesmo serviço, e <b>setas tracejadas atravessam a fronteira entre serviços</b>, mantidas apenas por identificador e por eventos (ADR-001). Os usuários e seus papéis vivem no Keycloak, não em tabela de serviço de negócio. Os atributos de cada entidade estão nas Figuras 9 a 11.</p>
+<div class="fig">
+<script type="text/mermaid">
+flowchart LR
+  subgraph IDP["Keycloak (IdP)"]
+    U["<b>USUARIO_IDP</b><br/>papéis: Cliente, Organizador,<br/>Operador, Admin"]:::idp
+  end
+  subgraph INV["Inventário - db_inventario"]
+    EV["<b>EVENTO</b>"]:::inv
+    LO["<b>LOTE</b>"]:::inv
+    SE["<b>SETOR</b>"]:::inv
+    AS["<b>ASSENTO</b>"]:::inv
+    RE["<b>RESERVA</b>"]:::inv
+    RI["<b>RESERVA_ITEM</b>"]:::inv
+  end
+  subgraph CHK["Checkout - db_checkout"]
+    PE["<b>PEDIDO</b>"]:::chk
+    PI["<b>PEDIDO_ITEM</b>"]:::chk
+    PA["<b>PAGAMENTO</b>"]:::chk
+  end
+  subgraph EMI["Emissão - db_emissao"]
+    IN["<b>INGRESSO</b>"]:::emi
+    VA["<b>VALIDACAO_ACESSO</b>"]:::emi
+    NO["<b>NOTIFICACAO</b>"]:::emi
+  end
+  EV -->|"1 para N"| LO
+  EV -->|"1 para N"| SE
+  SE -->|"1 para N"| AS
+  LO -->|"1 para N"| AS
+  RE -->|"1 para N"| RI
+  RI -->|"N para 0..1"| AS
+  RI -->|"N para 0..1"| LO
+  PE -->|"1 para N"| PI
+  PE -->|"1 para N tentativas"| PA
+  IN -->|"1 para N"| VA
+  IN -->|"1 para N"| NO
+  U -.->|"organiza"| EV
+  U -.->|"solicita"| RE
+  RE -.->|"origina, 1 para 0..1"| PE
+  PE -.->|"gera, 1 para N"| IN
+  U -.->|"valida (Operador)"| VA
+  classDef idp fill:#8a94a3,stroke:#5d6673,color:#fff
+  classDef inv fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef chk fill:#c2561a,stroke:#8d3c10,color:#fff
+  classDef emi fill:#1f8a5b,stroke:#136040,color:#fff
+</script>
+<div class="cap">Figura 8 – Modelo de dados conceitual integrado, com as fronteiras entre serviços.</div>
+</div>
+</div>
+
+<h2>3.2 Referências entre serviços e telemetria</h2>
+<p>O modelo conceitual do <b>telemetria-service</b> (<code>db_telemetria</code>) tem duas entidades: <code>EVENTO_TELEMETRIA</code> (<code>id</code>, <code>tipo</code>, <code>evento_id</code> com referência ao Inventário, <code>sessao_id</code>, <code>atributos</code> em JSON, <code>ocorrido_em</code>) e <code>METRICA_AGREGADA</code> (chave composta por <code>evento_id</code>, <code>metrica</code> e <code>janela_inicio</code>, mais <code>valor</code>). Elas não se relacionam por chave, porque a agregação é derivada. O <b>realtime-service</b> não possui banco.</p>
+<table>
+<thead><tr><th style="width:22%">Origem</th><th style="width:22%">Referência</th><th>Como é mantida</th></tr></thead>
+<tr><td>Checkout <code>PEDIDO.reserva_id</code></td><td>Inventário <code>RESERVA</code></td><td>Projeção <code>RESERVA_REF</code> atualizada por <code>ReservaCriada</code>, <code>ReservaExpirada</code>, <code>ReservaCancelada</code>.</td></tr>
+<tr><td>Inventário <code>ASSENTO.status</code></td><td>Checkout <code>PEDIDO</code></td><td>Evento <code>PedidoPago</code> converte assentos RESERVADO em VENDIDO e reserva em CONFIRMADA.</td></tr>
+<tr><td>Emissão <code>INGRESSO.pedido_id</code></td><td>Checkout <code>PEDIDO</code></td><td>Preenchido a partir do payload de <code>PedidoPago</code>, que carrega os itens necessários (sem consulta síncrona).</td></tr>
+<tr><td>Qualquer <code>usuario_id</code></td><td>Keycloak (<code>sub</code>)</td><td>Vem do JWT; nenhum dado pessoal é replicado (RNF15).</td></tr>
+</table>
+
+<div class="wide">
+<h2>3.3 Inventário</h2>
+<div class="fig">
+<script type="text/mermaid">
+erDiagram
+  EVENTO ||--o{ LOTE : possui
+  EVENTO ||--o{ SETOR : organiza
+  SETOR ||--o{ ASSENTO : contem
+  LOTE ||--o{ ASSENTO : precifica
+  RESERVA ||--|{ RESERVA_ITEM : agrupa
+  RESERVA_ITEM }o--o| ASSENTO : "reserva (marcado)"
+  RESERVA_ITEM }o--o| LOTE : "reserva (quantidade)"
+  EVENTO {
+    uuid id PK
+    uuid organizador_id "ref IAM"
+    string nome
+    string local
+    datetime data_hora
+    string imagem_url
+    string status "RASCUNHO, PUBLICADO, ENCERRADO"
+  }
+  LOTE {
+    uuid id PK
+    string nome
+    decimal preco
+    int quantidade
+    int qtd_reservada
+    int qtd_vendida
+    datetime inicio_venda
+    datetime fim_venda
+  }
+  SETOR {
+    uuid id PK
+    string nome
+    boolean marcado
+  }
+  ASSENTO {
+    uuid id PK
+    string codigo
+    string status "LIVRE, RESERVADO, VENDIDO"
+    int versao
+  }
+  RESERVA {
+    uuid id PK
+    uuid cliente_id "ref IAM"
+    string status "ATIVA, CONFIRMADA, EXPIRADA, CANCELADA"
+    datetime criada_em
+    datetime expira_em
+  }
+  RESERVA_ITEM {
+    uuid id PK
+    int quantidade
+  }
+</script>
+<div class="cap">Figura 9 – Modelo conceitual do Inventário. Ingressos sem assento marcado usam <code>RESERVA_ITEM.quantidade</code> contra o <code>LOTE</code>.</div>
+</div>
+</div>
+
+<div>
+<h2>3.4 Checkout</h2>
+<div class="fig">
+<script type="text/mermaid">
+%%{init: {"er": {"layoutDirection": "TB"}}}%%
+erDiagram
+  PEDIDO ||--|{ PEDIDO_ITEM : contem
+  PEDIDO ||--o{ PAGAMENTO : "tentativas"
+  PAGAMENTO ||--|| CHAVE_IDEMPOTENCIA : "protegido por"
+  RESERVA_REF ||--o| PEDIDO : "origina"
+  PEDIDO {
+    uuid id PK
+    uuid cliente_id "ref IAM"
+    uuid reserva_id "ref Inventario"
+    string status "CRIADO, RESERVADO, AGUARDANDO, PAGO, EXPIRADO"
+    decimal total
+    datetime criado_em
+    datetime expira_em
+    string motivo_expiracao
+  }
+  PEDIDO_ITEM {
+    uuid id PK
+    uuid assento_id "ref Inventario"
+    uuid lote_id "ref Inventario"
+    int quantidade
+    decimal preco_unitario
+  }
+  PAGAMENTO {
+    uuid id PK
+    string status "PENDENTE, APROVADO, RECUSADO"
+    decimal valor
+    string gateway_ref
+    datetime criado_em
+  }
+  CHAVE_IDEMPOTENCIA {
+    string chave PK
+    string hash_requisicao
+    int resposta_status
+    json resposta_corpo
+    datetime criada_em
+  }
+  RESERVA_REF {
+    uuid reserva_id PK
+    string status "ATIVA, EXPIRADA, CANCELADA, CONFIRMADA"
+    datetime expira_em
+    json itens "assentos, lotes, quantidades, precos"
+  }
+</script>
+<div class="cap">Figura 10 – Modelo conceitual do Checkout. <code>RESERVA_REF</code> é uma projeção local alimentada por eventos do Inventário, com os itens e preços recebidos em <code>ReservaCriada</code>.</div>
+</div>
+</div>
+
+<div class="wide">
+<h2>3.5 Emissão e IAM</h2>
+<div class="fig">
+<script type="text/mermaid">
+erDiagram
+  INGRESSO ||--o{ VALIDACAO_ACESSO : "lido em"
+  INGRESSO ||--o{ NOTIFICACAO : "comunicado por"
+  INGRESSO {
+    uuid id PK
+    uuid pedido_id "ref Checkout"
+    uuid cliente_id "ref IAM"
+    uuid evento_id "ref Inventario"
+    uuid assento_id "ref Inventario"
+    string qr_assinado
+    string status "EMITIDO, UTILIZADO, CANCELADO"
+    string pdf_ref
+    datetime emitido_em
+    datetime utilizado_em
+  }
+  VALIDACAO_ACESSO {
+    uuid id PK
+    uuid operador_id "ref IAM"
+    string resultado "LIBERADO, JA_UTILIZADO, INVALIDO"
+    datetime lido_em
+  }
+  NOTIFICACAO {
+    uuid id PK
+    string canal
+    string status "PENDENTE, ENVIADA, FALHA"
+    int tentativas
+    datetime enviada_em
+  }
+  CADASTRO_ORGANIZADOR ||--o{ AUDITORIA_CREDENCIAL : "gera registros"
+  CADASTRO_ORGANIZADOR {
+    uuid id PK
+    uuid usuario_id "sub do Keycloak"
+    string razao_social
+    string cnpj
+    string status "PENDENTE, APROVADO, REJEITADO"
+    datetime solicitado_em
+    uuid decidido_por
+    datetime decidido_em
+  }
+  AUDITORIA_CREDENCIAL {
+    uuid id PK
+    uuid usuario_id "sub do Keycloak"
+    string tipo "LOGIN, SENHA_ALTERADA, PAPEL_ALTERADO"
+    string resultado
+    datetime ocorrido_em
+  }
+</script>
+<div class="cap">Figura 11 – Modelo conceitual da Emissão (<code>db_emissao</code>) e do IAM (<code>db_iam</code>). Cada serviço também mantém <code>OUTBOX_EVENT</code> e <code>EVENTO_PROCESSADO</code>.</div>
+</div>
+</div>
+
+</div>
+
+<div class="section">
+<h1>4. Estrutura de Mensageria do Kafka</h1>
+
+<h2>4.1 Convenções</h2>
+<ul>
+  <li><b>Nome do tópico:</b> <code>&lt;servico&gt;.&lt;agregado&gt;.v1</code>. Um tópico por agregado, com vários tipos de evento; o sufixo <code>v1</code> versiona o contrato.</li>
+  <li><b>Chave da mensagem:</b> identificador do agregado, garantindo ordem por agregado dentro de uma partição.</li>
+  <li><b>Envelope:</b> <code>eventId</code> (UUID), <code>eventType</code>, <code>occurredAt</code>, <code>aggregateId</code>, <code>version</code>, <code>payload</code>. Cabeçalhos Kafka: <code>correlation-id</code> e <code>traceparent</code> (RNF16).</li>
+  <li><b>Formato:</b> JSON com schema documentado em <code>/specs/&lt;modulo&gt;/&lt;feature&gt;/design.md</code>. Regra de compatibilidade: somente adição de campos opcionais dentro de <code>v1</code>.</li>
+  <li><b>Produtor:</b> <code>acks=all</code>, <code>enable.idempotence=true</code>. <b>Consumidor:</b> <code>enable.auto.commit=false</code>, <i>commit</i> do offset após a transação local.</li>
+</ul>
+
+<h2>4.2 Tópicos</h2>
+<table>
+<thead><tr><th style="width:17%">Tópico</th><th style="width:23%">Eventos</th><th style="width:11%">Produtor</th><th style="width:19%">Consumidores</th><th style="width:11%">Chave</th><th style="width:19%">Partições e retenção</th></tr></thead>
+<tr><td><code>inventario.reserva.v1</code></td><td>ReservaCriada, ReservaExpirada, ReservaCancelada</td><td>Inventário</td><td>Checkout, Telemetria</td><td>reservaId</td><td>6 partições, 7 dias</td></tr>
+<tr><td><code>inventario.assento.v1</code></td><td>AssentoReservado, AssentoLiberado, AssentoVendido</td><td>Inventário</td><td>Realtime, Telemetria</td><td>eventoId</td><td>6 partições, 1 dia</td></tr>
+<tr><td><code>checkout.pedido.v1</code></td><td>PedidoCriado, PedidoReservado, PedidoAguardandoPagamento, PedidoPago, PagamentoRecusado, PedidoExpirado</td><td>Checkout</td><td>Inventário, Emissão, Realtime, Telemetria</td><td>pedidoId</td><td>6 partições, 7 dias</td></tr>
+<tr><td><code>emissao.ingresso.v1</code></td><td>IngressoEmitido, IngressoUtilizado, ComprovanteEnviado</td><td>Emissão</td><td>Realtime, Telemetria</td><td>pedidoId</td><td>3 partições, 7 dias</td></tr>
+<tr><td><code>iam.auditoria.v1</code></td><td>LoginRealizado, SenhaAlterada, PapelAlterado, OrganizadorAprovado</td><td>IAM</td><td>Telemetria</td><td>usuarioId</td><td>3 partições, 30 dias</td></tr>
+<tr><td><code>telemetria.navegacao.v1</code></td><td>PaginaVisualizada, AssentoSelecionado, CheckoutIniciado</td><td>Telemetria (ingestão)</td><td>Telemetria (agregador)</td><td>sessaoId</td><td>6 partições, 1 dia</td></tr>
+<tr><td><code>telemetria.metrica.v1</code></td><td>MetricaAgregada</td><td>Telemetria</td><td>Realtime</td><td>eventoId</td><td>3 partições, 1 dia</td></tr>
+<tr><td><code>&lt;topico&gt;.&lt;grupo&gt;.dlq</code></td><td>Mensagem original e causa</td><td>Consumidor</td><td>Operação (Kafka UI)</td><td>mantida</td><td>1 partição, 14 dias</td></tr>
+</table>
+<p>No Compose há um único broker, portanto fator de replicação 1; o valor é parametrizado por variável de ambiente para 3 em um cluster maior.</p>
+
+<h2>4.3 Catálogo de eventos e payloads principais</h2>
+<table>
+<thead><tr><th style="width:24%">Evento</th><th style="width:22%">Tópico</th><th>Campos principais do payload</th></tr></thead>
+<tr><td>ReservaCriada</td><td><code>inventario.reserva.v1</code></td><td><code>reservaId</code>, <code>clienteId</code>, <code>eventoId</code>, <code>itens[]</code> (<code>assentoId</code> ou <code>loteId</code>, <code>quantidade</code>, <code>precoUnitario</code>), <code>criadaEm</code>, <code>expiraEm</code></td></tr>
+<tr><td>ReservaExpirada, ReservaCancelada</td><td><code>inventario.reserva.v1</code></td><td><code>reservaId</code>, <code>motivo</code>, <code>ocorridaEm</code></td></tr>
+<tr><td>AssentoReservado, AssentoLiberado, AssentoVendido</td><td><code>inventario.assento.v1</code></td><td><code>eventoId</code>, <code>assentoId</code>, <code>status</code></td></tr>
+<tr><td>PedidoReservado, PedidoAguardandoPagamento</td><td><code>checkout.pedido.v1</code></td><td><code>pedidoId</code>, <code>reservaId</code>, <code>total</code>, <code>expiraEm</code></td></tr>
+<tr><td>PedidoPago</td><td><code>checkout.pedido.v1</code></td><td><code>pedidoId</code>, <code>clienteId</code>, <code>eventoId</code>, <code>itens[]</code>, <code>total</code>, <code>pagoEm</code></td></tr>
+<tr><td>PagamentoRecusado, PedidoExpirado</td><td><code>checkout.pedido.v1</code></td><td><code>pedidoId</code>, <code>motivo</code> (por exemplo <code>CANCELADO_PELO_CLIENTE</code>), <code>ocorridoEm</code></td></tr>
+<tr><td>IngressoEmitido</td><td><code>emissao.ingresso.v1</code></td><td><code>ingressoId</code>, <code>pedidoId</code>, <code>clienteId</code>, <code>eventoId</code>, <code>assentoId</code> ou <code>loteId</code>, <code>emitidoEm</code></td></tr>
+<tr><td>IngressoUtilizado</td><td><code>emissao.ingresso.v1</code></td><td><code>ingressoId</code>, <code>operadorId</code>, <code>lidoEm</code></td></tr>
+<tr><td>OrganizadorAprovado</td><td><code>iam.auditoria.v1</code></td><td><code>usuarioId</code>, <code>decididoPor</code>, <code>decididoEm</code></td></tr>
+<tr><td>MetricaAgregada</td><td><code>telemetria.metrica.v1</code></td><td><code>eventoId</code>, <code>metrica</code>, <code>janelaInicio</code>, <code>valor</code></td></tr>
+</table>
+<p>Exemplo de mensagem (<code>PedidoPago</code>, chave <code>pedidoId</code>):</p>
+<pre>{
+  "eventId": "7c1e5a52-3f0b-4d57-9b0e-2a64f1d1c8aa",
+  "eventType": "PedidoPago",
+  "occurredAt": "2026-11-04T21:15:03Z",
+  "aggregateId": "b3d1c2f0-91a7-4c53-8a1e-5d2f7e9c0a11",
+  "version": 1,
+  "payload": {
+    "pedidoId": "b3d1c2f0-91a7-4c53-8a1e-5d2f7e9c0a11",
+    "clienteId": "e4f6a9d2-0c7b-4e1a-b5d3-8f2a1c9e7b40",
+    "eventoId": "a91f0c77-2d4e-4b86-9c13-6e8d5b2f1a30",
+    "itens": [ { "assentoId": "3f2b8c1d-6a95-4e07-a1d4-9b7c0e5f2a68", "quantidade": 1, "precoUnitario": 250.00 } ],
+    "total": 250.00,
+    "pagoEm": "2026-11-04T21:15:03Z"
+  }
+}</pre>
+<h2>4.4 Mapa produtores, tópicos e consumidores</h2>
+<div class="fig">
+<script type="text/mermaid">
+flowchart LR
+  subgraph P["Produtores"]
+    direction TB
+    pInv["inventario-service"]:::svc
+    pChk["checkout-service"]:::svc
+    pEmi["emissao-service"]:::svc
+    pIam["iam-service"]:::svc
+    pTel["telemetria-service"]:::svc
+  end
+  subgraph T["Tópicos Kafka"]
+    direction TB
+    t1{{"inventario.reserva.v1"}}:::topic
+    t2{{"inventario.assento.v1"}}:::topic
+    t3{{"checkout.pedido.v1"}}:::topic
+    t4{{"emissao.ingresso.v1"}}:::topic
+    t5{{"iam.auditoria.v1"}}:::topic
+    t6{{"telemetria.navegacao.v1"}}:::topic
+    t7{{"telemetria.metrica.v1"}}:::topic
+  end
+  subgraph C["Consumidores"]
+    direction TB
+    cChk["checkout-service"]:::svc
+    cInv["inventario-service"]:::svc
+    cEmi["emissao-service"]:::svc
+    cRt["realtime-service"]:::svc
+    cTel["telemetria-service"]:::svc
+  end
+  pInv --> t1 & t2
+  pChk --> t3
+  pEmi --> t4
+  pIam --> t5
+  pTel --> t6 & t7
+  t1 --> cChk & cTel
+  t2 --> cRt & cTel
+  t3 --> cInv & cEmi & cRt & cTel
+  t4 --> cRt & cTel
+  t5 --> cTel
+  t6 --> cTel
+  t7 --> cRt
+  classDef svc fill:#2f6db5,stroke:#1d4c82,color:#fff
+  classDef topic fill:#e8731a,stroke:#b4560f,color:#fff
+</script>
+<div class="cap">Figura 12 – Fluxo de eventos entre serviços (seta para o tópico: publica; seta do tópico: consome).</div>
+</div>
+
+<h3>Consumer groups</h3>
+<table>
+<thead><tr><th style="width:26%">Serviço</th><th style="width:30%">Group ID</th><th>Observação</th></tr></thead>
+<tr><td>checkout, inventario, emissao, telemetria</td><td><code>&lt;servico&gt;-&lt;topico&gt;</code></td><td>Réplicas do mesmo serviço dividem as partições (RNF09).</td></tr>
+<tr><td>realtime-service</td><td><code>realtime-&lt;instanceId&gt;</code></td><td>Um grupo por réplica: toda réplica recebe todos os eventos e entrega apenas às sessões WebSocket que ela mantém.</td></tr>
+</table>
+
+<h2>4.5 Entrega confiável: Outbox, idempotência e falhas</h2>
+<ul>
+  <li><b>Escrita dupla (Dual-Write).</b> Nenhum serviço grava no banco e publica no Kafka em duas operações independentes. O serviço grava o estado e a linha em <code>outbox_event</code> <b>na mesma transação ACID</b>. O <code>OutboxRelayWorker</code> lê linhas não publicadas com <code>FOR UPDATE SKIP LOCKED</code> (várias réplicas sem conflito), publica com produtor idempotente e marca <code>publicado_em</code>. Se o Kafka estiver fora, as linhas ficam pendentes e saem quando ele voltar (RNF04).</li>
+  <li><b>Sistemas externos fora do Kafka.</b> O Checkout chama o gateway de pagamento fora da transação e protegido por idempotência (seção 2.3.6); o IAM chama a Admin API do Keycloak antes de confirmar a decisão, em operação idempotente que pode ser repetida. Assim, nenhuma chamada externa deixa o banco e o mundo exterior inconsistentes sem caminho de reprocessamento.</li>
+  <li><b>Entrega <i>at-least-once</i> e idempotência no consumo.</b> O relay pode republicar após uma falha entre o envio e a marcação. Por isso todo consumidor insere o <code>eventId</code> em <code>evento_processado</code> (chave primária) <b>na mesma transação</b> do efeito. Violação de chave significa evento já tratado: o consumidor confirma o offset e ignora (RNF05).</li>
+  <li><b>Ordem.</b> A chave por agregado preserva a ordem por pedido, reserva e evento. Consumidores toleram eventos tardios: por exemplo, o Checkout guarda <code>ReservaExpirada</code> mesmo que o pedido ainda não exista.</li>
+  <li><b>Mensagens venenosas.</b> Após 3 tentativas com backoff, a mensagem vai para o tópico <code>.dlq</code>, visível na Kafka UI, e o consumo segue.</li>
+  <li><b>Serviço fora do ar.</b> Se o emissao-service (emissão e notificações) cair, <code>PedidoPago</code> permanece retido no tópico e é processado na volta (RNF11); a venda não é afetada.</li>
+</ul>
+
+<h2>4.6 Fluxo ponta a ponta: da reserva ao ingresso</h2>
+<div class="fig">
+<script type="text/mermaid">
+sequenceDiagram
+  autonumber
+  participant S as SPA
+  participant I as Inventário
+  participant K as Kafka
+  participant C as Checkout
+  participant P as Gateway<br/>pagamento
+  participant E as Emissão
+  S->>I: POST /reservas (assentos)
+  I->>I: UPDATE condicional, reserva ATIVA<br/>e Outbox (1 transação)
+  I-->>S: 201 reservaId, expiraEm (ou 409)
+  I-)K: ReservaCriada, AssentoReservado
+  K-)C: ReservaCriada (atualiza RESERVA_REF)
+  Note over K,S: realtime-service consome AssentoReservado<br/>e atualiza o mapa de assentos por WebSocket
+  S->>C: POST /pedidos (reservaId)
+  Note right of C: CRIADO e RESERVADO
+  S->>C: POST /pagamentos (Idempotency-Key)
+  Note right of C: AGUARDANDO
+  C->>P: cobrança (timeout, retry, breaker)
+  P-->>C: aprovado
+  C->>C: PAGO + Outbox PedidoPago (1 transação)
+  C-)K: PedidoPago
+  K-)I: assentos VENDIDO, reserva CONFIRMADA
+  K-)E: emite ingresso, PDF e QR (deduplica)
+  E-)K: IngressoEmitido
+  Note over K,S: realtime-service consome IngressoEmitido<br/>e avisa a SPA: pedido emitido
+  Note over I,K: Sem pagamento em 10 min, o ExpiracaoWorker libera os assentos<br/>e publica ReservaExpirada, e o Checkout move o pedido para EXPIRADO
+</script>
+<div class="cap">Figura 13 – Sequência do fluxo principal (R1) com publicação via Outbox.</div>
+</div>
+</div>
+
+<div class="section">
+<h1>5. Pipeline de Desenvolvimento</h1>
+<p>A pipeline é executada no GitHub Actions a cada Pull Request e a cada merge na branch <code>develop</code>. Os mesmos comandos podem ser executados localmente pelo Maven e pelo Docker Compose, de modo que o resultado do CI seja reprodutível na máquina de qualquer integrante (RNF19, RNF20).</p>
+
+<h2>5.1 Visão esquemática</h2>
+<div class="fig">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 560"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs><style>.t{font:bold 14px Helvetica,Arial,sans-serif;fill:#fff;text-anchor:middle}
+.s{font:12px Helvetica,Arial,sans-serif;fill:#fff;text-anchor:middle;opacity:.95}
+.l{font:12px Helvetica,Arial,sans-serif;fill:#222;paint-order:stroke;stroke:#fff;stroke-width:3px}
+.bl{font:bold 12.5px Helvetica,Arial,sans-serif;fill:#44566f}
+.ln{fill:none;stroke:#333;stroke-width:1.8}
+.person{fill:#12305a;stroke:#0b1f3a}.cont{fill:#2f6db5;stroke:#1d4c82}.gate{fill:#e8731a;stroke:#b4560f}
+.grp{fill:#e9eff9;stroke:#9fb3d1}</style><rect x="50" y="10" width="220" height="60" rx="7" class="person"/>
+<text x="160.0" y="37.0" class="t">Desenvolvedor</text>
+<text x="160.0" y="53.0" class="s">branch feature/* ou fix/*</text>
+<rect x="330" y="10" width="220" height="60" rx="7" class="person"/>
+<text x="440.0" y="37.0" class="t">Pull Request</text>
+<text x="440.0" y="53.0" class="s">para develop</text>
+<path d="M270,40 H330" class="ln" marker-end="url(#a)"/>
+<rect x="40" y="110" width="860" height="160" rx="8" class="grp"/>
+<text x="52" y="129" class="bl">GitHub Actions: a cada Pull Request</text>
+<rect x="55" y="150" width="155" height="90" rx="7" class="cont"/>
+<text x="132.5" y="184.0" class="t">1. Lint</text>
+<text x="132.5" y="200.0" class="s">Spotless, Checkstyle,</text>
+<text x="132.5" y="216.0" class="s">ESLint, compose config</text>
+<rect x="224" y="150" width="155" height="90" rx="7" class="cont"/>
+<text x="301.5" y="184.0" class="t">2. Unitários</text>
+<text x="301.5" y="200.0" class="s">JUnit 5 + JaCoCo</text>
+<text x="301.5" y="216.0" class="s">domínio ≥ 70%</text>
+<rect x="393" y="150" width="155" height="90" rx="7" class="cont"/>
+<text x="470.5" y="184.0" class="t">3. Integração</text>
+<text x="470.5" y="200.0" class="s">Testcontainers:</text>
+<text x="470.5" y="216.0" class="s">PostgreSQL, Kafka, Redis</text>
+<rect x="562" y="150" width="155" height="90" rx="7" class="cont"/>
+<text x="639.5" y="184.0" class="t">4. Build</text>
+<text x="639.5" y="200.0" class="s">Maven e imagens</text>
+<text x="639.5" y="216.0" class="s">Docker</text>
+<rect x="731" y="150" width="155" height="90" rx="7" class="cont"/>
+<text x="808.5" y="184.0" class="t">5. Smoke test</text>
+<text x="808.5" y="200.0" class="s">docker compose</text>
+<text x="808.5" y="216.0" class="s">up --wait</text>
+<path d="M210,195 H224" class="ln" marker-end="url(#a)"/>
+<path d="M379,195 H393" class="ln" marker-end="url(#a)"/>
+<path d="M548,195 H562" class="ln" marker-end="url(#a)"/>
+<path d="M717,195 H731" class="ln" marker-end="url(#a)"/>
+<path d="M440,70 V110" class="ln" marker-end="url(#a)"/>
+<rect x="250" y="305" width="380" height="62" rx="7" class="gate"/>
+<text x="440.0" y="333.0" class="t">Portão de merge</text>
+<text x="440.0" y="349.0" class="s">checks 1 a 5 verdes e 1 aprovação humana</text>
+<path d="M440,270 V305" class="ln" marker-end="url(#a)"/>
+<path d="M250,336 H20 V40 H50" class="ln" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="150" y="328" class="l" text-anchor="middle">reprovado: ajustes</text>
+<rect x="40" y="410" width="860" height="130" rx="8" class="grp"/>
+<text x="52" y="429" class="bl">Após a aprovação</text>
+<rect x="55" y="445" width="175" height="80" rx="7" class="person"/>
+<text x="142.5" y="482.0" class="t">Squash merge</text>
+<text x="142.5" y="498.0" class="s">em develop</text>
+<rect x="275" y="445" width="175" height="80" rx="7" class="cont"/>
+<text x="362.5" y="474.0" class="t">6. PIT</text>
+<text x="362.5" y="490.0" class="s">mutação ≥ 60% nos</text>
+<text x="362.5" y="506.0" class="s">módulos críticos</text>
+<rect x="495" y="445" width="175" height="80" rx="7" class="cont"/>
+<text x="582.5" y="474.0" class="t">7. Publicação</text>
+<text x="582.5" y="490.0" class="s">imagens no GHCR</text>
+<text x="582.5" y="506.0" class="s">tag develop</text>
+<rect x="715" y="445" width="175" height="80" rx="7" class="person"/>
+<text x="802.5" y="474.0" class="t">Release</text>
+<text x="802.5" y="490.0" class="s">PR develop para main</text>
+<text x="802.5" y="506.0" class="s">e tag vX.Y.Z</text>
+<path d="M230,485 H275" class="ln" marker-end="url(#a)"/>
+<path d="M450,485 H495" class="ln" marker-end="url(#a)"/>
+<path d="M670,485 H715" class="ln" marker-end="url(#a)"/>
+<path d="M440,367 V410" class="ln" marker-end="url(#a)"/>
+<text x="452" y="392" class="l" text-anchor="start">aprovado</text></svg>
+<div class="cap">Figura 14 – Pipeline de CI/CD do PulsePass.</div>
+</div>
+
+<h2>5.2 Etapas e portões de qualidade</h2>
+<table>
+<thead><tr><th style="width:5%">#</th><th style="width:17%">Etapa</th><th>O que executa</th><th style="width:28%">Critério para passar</th></tr></thead>
+<tr><td>1</td><td>Lint</td><td>Spotless e Checkstyle no backend; ESLint e Prettier no frontend; validação do <code>docker-compose.yml</code> (<code>docker compose config</code>).</td><td>Sem violações; falha derruba a pipeline (RNF18).</td></tr>
+<tr><td>2</td><td>Testes unitários</td><td><code>mvn test</code> com JUnit 5, focado nas máquinas de estado de Reserva, Pedido, Pagamento e Ingresso; relatório JaCoCo publicado como artefato; Vitest no frontend.</td><td>Cobertura do domínio ≥ 70% (RNF17); testes escritos antes da implementação, quando gerados por agente.</td></tr>
+<tr><td>3</td><td>Testes de integração</td><td><code>mvn verify</code> com Testcontainers reais de PostgreSQL, Kafka e Redis: reserva concorrente (500 requisições, 1 sucesso), Outbox com Kafka indisponível, consumidor reprocessando o mesmo evento, pagamento com mesma <code>Idempotency-Key</code>.</td><td>Todos passam; RNF01, RNF03, RNF04 e RNF05 verificados.</td></tr>
+<tr><td>4</td><td>Build</td><td>Compilação e empacotamento de cada serviço; build das imagens Docker, com cache de camadas e de dependências Maven.</td><td>Imagens construídas sem erro.</td></tr>
+<tr><td>5</td><td>Smoke test</td><td><code>docker compose up --wait</code> (backend, frontend, bancos, Kafka, Kafka UI, Keycloak, observabilidade) e verificação dos <i>healthchecks</i> e de um fluxo mínimo de login e catálogo; auditoria Lighthouse/axe da SPA.</td><td>Todos os serviços saudáveis em até 3 min (RNF19); Lighthouse/axe ≥ 90 (RNF22).</td></tr>
+<tr><td>6</td><td>Mutação (PIT)</td><td>Roda após o merge em <code>develop</code> e à noite, sobre os módulos críticos (domínio e Outbox), por ser mais lenta.</td><td>Mutação ≥ 60% (regra do Test Agent); resultado vira issue se cair abaixo.</td></tr>
+<tr><td>7</td><td>Publicação</td><td>Publica imagens no GitHub Container Registry com tag <code>develop</code> (merge) ou <code>vX.Y.Z</code> (release).</td><td>Executa só após as etapas anteriores.</td></tr>
+</table>
+<p><b>Verificações complementares:</b> Dependabot para dependências, varredura de segredos (gitleaks) em cada PR e análise estática com SonarLint na IDE. <b>Testes de carga</b> (k6) com as metas dos RNF06 e RNF07 são um bônus: ficam em um workflow manual (<code>workflow_dispatch</code>) para não alongar o PR.</p>
+<p><b>Proteção da branch.</b> A branch <code>develop</code> exige o sucesso das etapas 1 a 5 como <i>required checks</i> (RNF20), o que bloqueia o merge de PR com pipeline vermelha.</p>
+
+<h2>5.3 Ambiente executável: Docker Compose</h2>
+<table>
+<thead><tr><th style="width:24%">Serviço no Compose</th><th style="width:30%">Imagem ou origem</th><th>Observação</th></tr></thead>
+<tr><td><code>frontend</code></td><td>build local (Nginx)</td><td>Serve a SPA; porta 80.</td></tr>
+<tr><td><code>api-gateway</code>, <code>iam-service</code>, <code>inventario-service</code>, <code>checkout-service</code>, <code>emissao-service</code>, <code>telemetria-service</code>, <code>realtime-service</code></td><td>build local (Maven)</td><td><code>depends_on</code> com <code>condition: service_healthy</code>; réplicas configuráveis (RNF09).</td></tr>
+<tr><td><code>gateway-pagamento</code></td><td>build local</td><td>Simulador; comportamento por variáveis de ambiente.</td></tr>
+<tr><td><code>postgres</code></td><td>postgres:16</td><td>Um banco lógico por serviço, criados por script de inicialização.</td></tr>
+<tr><td><code>redis</code></td><td>redis:7</td><td>Cache, locks e fila virtual.</td></tr>
+<tr><td><code>kafka</code> e <code>kafka-ui</code></td><td>apache/kafka (KRaft) e UI de mensageria</td><td>Tópicos criados por um contêiner de inicialização, conforme a seção 4.2.</td></tr>
+<tr><td><code>keycloak</code></td><td>Keycloak com <i>realm</i> importado</td><td>Papéis e usuários de teste no arquivo do realm.</td></tr>
+<tr><td><code>mailpit</code></td><td>servidor SMTP de desenvolvimento</td><td>Captura os e-mails de ingresso.</td></tr>
+<tr><td><code>otel-collector</code>, <code>prometheus</code>, <code>grafana</code></td><td>imagens oficiais</td><td>Traces, métricas e painéis (RNF16).</td></tr>
+</table>
+<p>Variáveis sensíveis ficam em <code>.env</code> (ignorado pelo Git); o repositório traz apenas <code>.env.example</code> com valores de desenvolvimento.</p>
+</div>
+
+<div class="section">
+<h1>6. Processo de Gerenciamento da Configuração de Software (GCS)</h1>
+
+<h2>6.1 Ferramenta</h2>
+<p>Git para versionamento e GitHub como plataforma: repositório, Pull Requests, GitHub Projects (quadro Kanban e Story Map), Issues, Actions e Container Registry. Toda a configuração do software é versionada no repositório, sem artefatos fora dele.</p>
+
+<h2>6.2 Itens de configuração</h2>
+<table>
+<thead><tr><th style="width:30%">Item</th><th>Local no repositório</th></tr></thead>
+<tr><td>Código-fonte dos serviços e da SPA</td><td><code>/services/&lt;servico&gt;</code>, <code>/frontend</code></td></tr>
+<tr><td>Specs (requirements, design, tasks)</td><td><code>/specs/&lt;modulo&gt;/&lt;feature&gt;</code></td></tr>
+<tr><td>Decisões arquiteturais (ADRs) e diagramas C4</td><td><code>/docs/adr</code>, <code>/docs/arquitetura</code> (Mermaid)</td></tr>
+<tr><td>Documentos dos pacotes de entrega</td><td><code>/docs/pacotes</code></td></tr>
+<tr><td>Regras e prompts dos agentes de IA</td><td><code>/.claude</code> ou <code>/.github</code></td></tr>
+<tr><td>Infraestrutura: Compose, Dockerfiles, <i>realm</i> do Keycloak, scripts de tópicos</td><td><code>/infra</code>, <code>docker-compose.yml</code></td></tr>
+<tr><td>Pipelines</td><td><code>/.github/workflows</code></td></tr>
+</table>
+
+<h2>6.3 Fluxo de trabalho de branches</h2>
+<table>
+<thead><tr><th style="width:18%">Branch</th><th style="width:34%">Uso</th><th>Regras</th></tr></thead>
+<tr><td><code>main</code></td><td>Versões estáveis, uma por pacote de entrega.</td><td>Só recebe PR vindo de <code>develop</code>; cada merge recebe uma tag.</td></tr>
+<tr><td><code>develop</code></td><td>Integração contínua do trabalho.</td><td>Protegida: sem <i>push</i> direto, sem <i>force push</i>; PR com pipeline verde e 1 aprovação.</td></tr>
+<tr><td><code>feature/&lt;id&gt;-&lt;descricao&gt;</code></td><td>Uma história de usuário, por exemplo <code>feature/US15-reserva-atomica</code>.</td><td>Criada a partir de <code>develop</code>; vida curta (poucos dias); removida após o merge.</td></tr>
+<tr><td><code>fix/&lt;id&gt;-&lt;descricao&gt;</code></td><td>Correção de defeito.</td><td>Mesmas regras de <code>feature/*</code>.</td></tr>
+</table>
+<div class="fig">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 330"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs><style>.t{font:bold 14px Helvetica,Arial,sans-serif;fill:#fff;text-anchor:middle}
+.s{font:12px Helvetica,Arial,sans-serif;fill:#fff;text-anchor:middle;opacity:.95}
+.l{font:12px Helvetica,Arial,sans-serif;fill:#222;paint-order:stroke;stroke:#fff;stroke-width:3px}
+.bl{font:bold 12.5px Helvetica,Arial,sans-serif;fill:#44566f}
+.ln{fill:none;stroke:#333;stroke-width:1.8}
+.person{fill:#12305a;stroke:#0b1f3a}.cont{fill:#2f6db5;stroke:#1d4c82}.gate{fill:#e8731a;stroke:#b4560f}
+.grp{fill:#e9eff9;stroke:#9fb3d1}</style><rect x="20" y="10" width="900" height="140" rx="8" class="grp"/>
+<text x="32" y="29" class="bl">1. Preparar e desenvolver</text>
+<rect x="40" y="50" width="195" height="80" rx="7" class="cont"/>
+<text x="137.5" y="79.0" class="t">Issue da história</text>
+<text x="137.5" y="95.0" class="s">critérios de aceite</text>
+<text x="137.5" y="111.0" class="s">e spec aprovada</text>
+<rect x="255" y="50" width="195" height="80" rx="7" class="cont"/>
+<text x="352.5" y="79.0" class="t">Branch feature/*</text>
+<text x="352.5" y="95.0" class="s">criada a partir</text>
+<text x="352.5" y="111.0" class="s">de develop</text>
+<rect x="470" y="50" width="195" height="80" rx="7" class="cont"/>
+<text x="567.5" y="79.0" class="t">Commits pequenos</text>
+<text x="567.5" y="95.0" class="s">Conventional</text>
+<text x="567.5" y="111.0" class="s">Commits</text>
+<rect x="685" y="50" width="195" height="80" rx="7" class="cont"/>
+<text x="782.5" y="79.0" class="t">Pull Request</text>
+<text x="782.5" y="95.0" class="s">modelo e indicação de</text>
+<text x="782.5" y="111.0" class="s">partes geradas por IA</text>
+<path d="M235,90 H255" class="ln" marker-end="url(#a)"/>
+<path d="M450,90 H470" class="ln" marker-end="url(#a)"/>
+<path d="M665,90 H685" class="ln" marker-end="url(#a)"/>
+<rect x="20" y="180" width="900" height="140" rx="8" class="grp"/>
+<text x="32" y="199" class="bl">2. Revisar e integrar</text>
+<rect x="40" y="220" width="235" height="80" rx="7" class="gate"/>
+<text x="157.5" y="249.0" class="t">Revisão</text>
+<text x="157.5" y="265.0" class="s">outro integrante e CI verde;</text>
+<text x="157.5" y="281.0" class="s">ajustes voltam aos commits</text>
+<rect x="345" y="220" width="235" height="80" rx="7" class="cont"/>
+<text x="462.5" y="257.0" class="t">Squash merge</text>
+<text x="462.5" y="273.0" class="s">em develop</text>
+<rect x="650" y="220" width="255" height="80" rx="7" class="cont"/>
+<text x="777.5" y="257.0" class="t">Release</text>
+<text x="777.5" y="273.0" class="s">PR develop para main e tag vX.Y.Z</text>
+<path d="M782,130 V155 H167 V220" class="ln" marker-end="url(#a)"/>
+<path d="M275,260 H345" class="ln" marker-end="url(#a)"/>
+<text x="310" y="252" class="l" text-anchor="middle">aprovado</text>
+<path d="M580,260 H650" class="ln" marker-end="url(#a)"/></svg>
+<div class="cap">Figura 15 – Fluxo de uma mudança, da issue à release.</div>
+</div>
+
+<h2>6.4 Regras de uso</h2>
+<ol>
+  <li><b>Todo trabalho nasce de uma issue</b> ligada ao épico (milestone) e à release (R1, R2, R3), com critérios de aceite e spec aprovada (Definition of Ready do Pacote 1).</li>
+  <li><b>Commits</b> seguem Conventional Commits (<code>feat:</code>, <code>fix:</code>, <code>docs:</code>, <code>test:</code>, <code>chore:</code>) e citam a issue (<code>feat(inventario): reserva atômica (#15)</code>).</li>
+  <li><b>Pull Request obrigatório</b> para <code>develop</code> e <code>main</code>. O modelo de PR traz: história, resumo, como testar, <b>quais partes foram geradas por IA</b> e a checklist da Definition of Done.</li>
+  <li><b>Revisão:</b> o aprovador deve ser integrante diferente do autor. Agentes de IA comentam, mas nunca aprovam nem fazem merge.</li>
+  <li><b>Merge por squash</b>, mantendo histórico linear em <code>develop</code>; o título do PR vira a mensagem do commit.</li>
+  <li><b>Mudança de requisito ou de contrato:</b> altera primeiro a spec ou o ADR no mesmo PR; contratos de evento só mudam por adição de campos opcionais, ou por um novo tópico <code>v2</code>.</li>
+  <li><b>Segredos</b> nunca são versionados: <code>.env</code> está no <code>.gitignore</code>; a pipeline usa GitHub Secrets; a varredura de segredos é um check obrigatório.</li>
+  <li><b>Responsáveis por código:</b> arquivo <code>CODEOWNERS</code> indica o responsável por cada serviço; o PR solicita a revisão automaticamente.</li>
+</ol>
+
+<h2>6.5 Versionamento, linhas de base e controle de mudanças</h2>
+<ul>
+  <li><b>Versionamento semântico</b> por tags em <code>main</code>: <code>v0.2.0</code> para o Pacote 2 (arquitetura e infraestrutura), <code>v0.3.0</code> para o checkpoint do Pacote 3 e <code>v1.0.0</code> para o produto completo do Pacote 4.</li>
+  <li><b>Linha de base:</b> cada tag congela o código, as specs, os ADRs e a documentação daquele pacote. Os pacotes 3 e 4 atualizam os documentos dos pacotes 1 e 2 por PR, mantendo o histórico das versões.</li>
+  <li><b>Controle de mudanças:</b> mudança proposta → issue com rótulo <code>mudanca</code> → impacto avaliado na spec e nos RNFs → aprovada por outro integrante → implementada por PR. Mudanças de arquitetura geram um novo ADR numerado.</li>
+  <li><b>Auditoria:</b> o histórico do Git, os PRs e a execução da pipeline são o registro de quem mudou o quê, quando, por qual motivo e com qual evidência de teste.</li>
+</ul>
+</div>
+
+<div class="section">
+<h1>7. Rastreabilidade com o enunciado do Pacote 2</h1>
+<table>
+<thead><tr><th style="width:44%">Entregável exigido</th><th>Onde está neste documento</th></tr></thead>
+<tr><td>Descrição da arquitetura no modelo C4 (Contexto, Contêineres, Componentes)</td><td>Seção 2: Figuras 1 (Nível 1), 2 (Nível 2) e 3 a 7 (Nível 3, um por serviço de negócio)</td></tr>
+<tr><td>Descrição do Modelo de Dados Conceitual</td><td>Seção 3: Figuras 8 a 11 (visão integrada e por serviço), entidades de Telemetria e referências entre serviços (3.2)</td></tr>
+<tr><td>Descrição da estrutura de mensageria do Kafka</td><td>Seção 4: tópicos (4.2), mapa (Figura 12), Outbox e idempotência (4.5), sequência (Figura 13)</td></tr>
+<tr><td>Descrição esquemática da Pipeline de desenvolvimento</td><td>Seção 5: Figura 14, etapas e portões (5.2) e Docker Compose (5.3)</td></tr>
+<tr><td>Descrição do Processo de GCS</td><td>Seção 6: ferramenta, itens de configuração, branches (Figura 15), regras e versionamento</td></tr>
+</table>
+<p>Os requisitos do enunciado sobre <i>Dual-Write</i> e idempotência no consumo são tratados nas ADRs 003 e 004 e na seção 4.5.</p>
+</div>
+
+<div class="section">
+<h1>8. Atualizações do Pacote 3</h1>
+<p>Este documento foi entregue em 04/11/2026 como desenho. O Pacote 3 implementou a fatia vertical R1 (catálogo, reserva atômica, pedido, pagamento idempotente, ingresso e validação), e o desenho foi seguido com as diferenças abaixo. As seções 1 a 7 permanecem como o desenho de referência; esta seção registra o que mudou ao construir.</p>
+<p><b>Implementado e verificado:</b> ADR-001 a ADR-004, ADR-007 e ADR-008; Outbox com <code>FOR UPDATE SKIP LOCKED</code> e consumo idempotente (<code>evento_processado</code>); máquinas de estado de reserva, assento, pedido, pagamento e ingresso; reserva com <code>UPDATE</code> condicional e filtro Redis; pagamento com <code>Idempotency-Key</code>, retry e circuit breaker; QR assinado; pipeline, Compose e processo de GCS descritos nas seções 5 e 6.</p>
+<p><b>Ainda não implementado (Pacote 4):</b> iam-service, telemetria-service, realtime-service, SPA, e-mail, fila virtual, observabilidade completa e rate limit no gateway. A tabela abaixo detalha as diferenças; o estado de cada história e de cada requisito não funcional, com a evidência de teste, está no documento do Pacote 3.</p>
+<table><thead><tr><th style="width:16%">Seção do Pacote 2</th><th style="width:27%">Desenhado</th><th style="width:57%">Como ficou</th></tr></thead><tr><td>2.3.2 Checkout</td><td><code>IdempotencyFilter</code> como filtro servlet</td><td>A lógica está em <code>PagamentoService</code> (TX1, gateway fora de transação, TX2). Mesmas regras; chamada concorrente com a mesma chave enquanto a primeira roda recebe 409.</td></tr><tr><td>2.3.2 Checkout</td><td>Falha do gateway</td><td>Responde 503; o pagamento falho passa a ter chave própria (<code>#falha:id</code>) para a chave do cliente poder ser reutilizada. Recusa responde 402.</td></tr><tr><td>2.3.3 Emissão</td><td><code>PdfStorage</code> e <code>NotificacaoWorker</code>/<code>EmailSender</code></td><td>O PDF é gerado sob demanda, sem armazenamento (serviço continua sem estado). E-mail e a tabela <code>NOTIFICACAO</code> ficam para o Pacote 4 (US25 é R2).</td></tr><tr><td>2.2 Contêineres</td><td>iam-service, telemetria-service, realtime-service e SPA</td><td>Não implementados no Pacote 3. Os papéis vêm direto do Keycloak (<code>realm_access.roles</code>), e cada serviço valida o JWT pelo JWKS.</td></tr><tr><td>2.2 Contêineres</td><td>API Gateway com rate limit</td><td>O gateway valida JWT e roteia sob o prefixo <code>/api</code>; o rate limit não foi implementado.</td></tr><tr><td>2.3.1 Inventário</td><td><code>FilaController</code> e fila virtual</td><td>Não implementados. O Redis é usado só para o cache do catálogo e para o <code>SeatLock</code>.</td></tr><tr><td>3 Dados</td><td>Tabela de Outbox</td><td><code>outbox_event</code> guarda <code>topic</code>, <code>msg_key</code> e o envelope completo em <code>body</code>. A reserva ganhou <code>suspensa_ate</code> (ADR-008) e o lote tem <code>check</code> contra sobre-venda. O ingresso guarda <code>evento_nome</code> e <code>descricao</code> copiados do pedido.</td></tr><tr><td>4 Kafka</td><td>Criação de tópicos</td><td>Um contêiner <code>kafka-init</code> cria os tópicos com as partições da seção 4.2 e a criação automática está desligada. Sem isso, o consumidor que subia primeiro fazia o Kafka criar o tópico com 1 partição (defeito encontrado no smoke). Existem os tópicos de reserva, assento, pedido, ingresso e três DLQs; os de IAM e telemetria não foram criados.</td></tr><tr><td>4 Kafka</td><td>DLQ</td><td>Três tentativas com intervalo de 500 ms e depois o tópico <code>&lt;tópico&gt;.&lt;grupo&gt;.dlq</code>, na biblioteca <code>commons</code>.</td></tr><tr><td>5 Pipeline</td><td>Etapas</td><td>Workflow <code>.github/workflows/ci.yml</code> com lint, testes, smoke, varredura de segredos, PIT (perfil Maven <code>mutacao</code>, no push em develop e à noite) e publicação no GHCR. Compose sem OpenTelemetry, Prometheus, Grafana e Mailpit.</td></tr><tr><td>1.1 Stack</td><td>Versões</td><td>Spring Boot 3.5.16, Spring Cloud 2025.0.3, Resilience4j 2.4.0 (uso programático), PDFBox 3.0.8, ZXing 3.5.4, Testcontainers 2.x, Keycloak 26.0.</td></tr></table>
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'base',
+    themeVariables: { fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '14px' },
+    flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+    sequence: { useMaxWidth: true, wrap: false, width: 150, actorMargin: 30, messageMargin: 26, boxMargin: 6, noteMargin: 8, mirrorActors: false },
+    er: { useMaxWidth: true, layoutDirection: 'LR' } });
+  let n = 0;
+  for (const s of document.querySelectorAll('script[type="text/mermaid"]')) {
+    const { svg } = await mermaid.render('mmd' + (n++), s.textContent.trim());
+    const d = document.createElement('div');
+    d.className = 'mermaid';
+    d.innerHTML = svg;
+    s.after(d);
+  }
+  document.body.dataset.done = String(n);
+</script>
+</body>
+</html>
