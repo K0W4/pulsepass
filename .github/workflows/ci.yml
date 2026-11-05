@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  schedule:
+    - cron: "0 5 * * *" # mutação noturna (PIT)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: 1. Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - name: Spotless (google-java-format)
+        run: ./mvnw -B -q spotless:check
+      - name: Validar docker-compose.yml
+        run: docker compose --env-file .env.example config -q
+
+  testes:
+    name: 2 e 3. Testes unitários e de integração (Testcontainers) + cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - name: Verify (unitários, integração e portão de 70% no domínio)
+        run: ./mvnw -B verify
+      - name: Relatórios JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco
+          path: "**/target/site/jacoco"
+          if-no-files-found: ignore
+
+  build-e-smoke:
+    name: 4 e 5. Build das imagens e smoke test do Compose
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Subir o ambiente completo
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait --wait-timeout 600
+      - name: Smoke test ponta a ponta
+        run: ./scripts/smoke.sh
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Derrubar
+        if: always()
+        run: docker compose down -v
+
+  segredos:
+    name: Varredura de segredos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  mutacao:
+    name: 6. Teste de mutação (PIT, domínio >= 60%)
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - name: PIT nos domínios
+        run: |
+          for s in inventario checkout emissao; do
+            ./mvnw -B -f services/$s-service/pom.xml -Pmutacao test-compile org.pitest:pitest-maven:mutationCoverage -DskipITs
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pit
+          path: "**/target/pit-reports"
+          if-no-files-found: ignore
+
+  publicar:
+    name: 7. Publicar imagens (GHCR)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: [testes, build-e-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        modulo: [inventario-service, checkout-service, emissao-service, gateway-pagamento, api-gateway]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile.service
+          build-args: MODULE=${{ matrix.modulo }}
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/pulsepass-${{ matrix.modulo }}:develop
