@@ -46,7 +46,7 @@ class RotasTest {
     String url = "http://127.0.0.1:" + DESTINO.getAddress().getPort();
     r.add("INVENTARIO_URL", () -> url);
     r.add("CHECKOUT_URL", () -> url);
-    r.add("EMISSAO_URL", () -> url);
+    r.add("EMISSAO_URL", () -> "http://127.0.0.1:1"); // porta fechada: serviço fora do ar
   }
 
   @Autowired ApplicationContext contexto;
@@ -97,14 +97,20 @@ class RotasTest {
         .expectBody()
         .jsonPath("$.caminho")
         .isEqualTo("/pagamentos");
-    c.get()
+  }
+
+  @Test
+  void servicoForaDoArResponde503EmVezDe500() {
+    cliente()
+        .mutateWith(mockJwt())
+        .get()
         .uri("/api/ingressos")
         .exchange()
         .expectStatus()
-        .isOk()
+        .isEqualTo(503)
         .expectBody()
-        .jsonPath("$.caminho")
-        .isEqualTo("/ingressos");
+        .jsonPath("$.erro")
+        .isEqualTo("servico_indisponivel");
   }
 
   @Test

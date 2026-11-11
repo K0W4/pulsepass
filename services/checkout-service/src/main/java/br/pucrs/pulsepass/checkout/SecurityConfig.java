@@ -19,7 +19,7 @@ public class SecurityConfig {
     http.csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(
             a ->
-                a.requestMatchers("/actuator/health/**", "/error")
+                a.requestMatchers("/actuator/health/**", "/actuator/prometheus", "/error")
                     .permitAll()
                     .requestMatchers("/pedidos/**", "/pagamentos/**")
                     .hasRole("CLIENTE")

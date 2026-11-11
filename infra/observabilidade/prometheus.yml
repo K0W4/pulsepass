@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: servicos
+    metrics_path: /actuator/prometheus
+    # descoberta por DNS: encontra todas as réplicas de cada serviço (RNF09)
+    dns_sd_configs:
+      - names: [api-gateway, inventario-service, checkout-service, emissao-service]
+        type: A
+        port: 8080
+      - names: [gateway-pagamento]
+        type: A
+        port: 8090
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: servico

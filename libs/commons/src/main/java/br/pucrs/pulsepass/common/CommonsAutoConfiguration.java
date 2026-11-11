@@ -1,7 +1,9 @@
 package br.pucrs.pulsepass.common;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
@@ -26,8 +28,8 @@ import org.springframework.util.backoff.FixedBackOff;
 public class CommonsAutoConfiguration {
 
   @Bean
-  Outbox outbox(JdbcTemplate jdbc, ObjectMapper mapper) {
-    return new Outbox(jdbc, mapper);
+  Outbox outbox(JdbcTemplate jdbc, ObjectMapper mapper, ObjectProvider<Tracer> tracer) {
+    return new Outbox(jdbc, mapper, tracer);
   }
 
   @Bean

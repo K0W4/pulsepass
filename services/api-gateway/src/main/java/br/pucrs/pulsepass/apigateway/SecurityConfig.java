@@ -21,7 +21,7 @@ public class SecurityConfig {
     return http.csrf(ServerHttpSecurity.CsrfSpec::disable)
         .authorizeExchange(
             a ->
-                a.pathMatchers("/actuator/health/**")
+                a.pathMatchers("/actuator/health/**", "/actuator/prometheus")
                     .permitAll()
                     .pathMatchers(
                         HttpMethod.GET, "/api/eventos", "/api/eventos/*", "/api/eventos/*/assentos")
