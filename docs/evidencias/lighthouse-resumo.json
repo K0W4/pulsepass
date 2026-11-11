@@ -1,0 +1,26 @@
+{
+  "catalogo-desktop": {
+    "acessibilidade": 100,
+    "boas_praticas": 100,
+    "versao_lighthouse": "12.8.2",
+    "url": "http://localhost:3000/"
+  },
+  "catalogo-mobile": {
+    "acessibilidade": 100,
+    "boas_praticas": 100,
+    "versao_lighthouse": "12.8.2",
+    "url": "http://localhost:3000/"
+  },
+  "detalhe-desktop": {
+    "acessibilidade": 100,
+    "boas_praticas": 100,
+    "versao_lighthouse": "12.8.2",
+    "url": "http://localhost:3000/#/evento/9f717475-5158-4d31-bff9-97df3293dec9"
+  },
+  "detalhe-mobile": {
+    "acessibilidade": 100,
+    "boas_praticas": 100,
+    "versao_lighthouse": "12.8.2",
+    "url": "http://localhost:3000/#/evento/9f717475-5158-4d31-bff9-97df3293dec9"
+  }
+}

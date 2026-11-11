@@ -3,50 +3,23 @@
 # (duas vezes, mesma Idempotency-Key), recebe o ingresso e o operador valida o QR duas vezes.
 # Qualquer asserção que não bater encerra o script com erro.
 set -euo pipefail
-cd "$(dirname "$0")/.."
-set -a
-if [ -f .env ]; then . ./.env; else . ./.env.example; fi
-set +a
+. "$(dirname "$0")/lib.sh"
 
-GW=${GATEWAY_URL:-http://localhost:8080}
-KC=${KEYCLOAK_URL:-http://localhost:8081}
-SENHA=${DEV_USER_PASSWORD:?defina DEV_USER_PASSWORD}
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
-
-ok()    { printf '  ok    %s\n' "$1"; }
-falha() { printf '  FALHA %s\n' "$1" >&2; exit 1; }
-espero() { # espero VALOR_OBTIDO VALOR_ESPERADO descricao
-  if [ "$1" = "$2" ]; then ok "$3"; else falha "$3 (esperado '$2', obtido '$1')"; fi
-}
-
-token() {
-  curl -fsS "$KC/realms/pulsepass/protocol/openid-connect/token" \
-    -d grant_type=password -d client_id=pulsepass-api \
-    -d "username=$1@pulsepass.test" --data-urlencode "password=$SENHA" | jq -r .access_token
-}
-
-# req TOKEN METODO CAMINHO [CORPO] [CABECALHO]  ->  corpo em $TMP/corpo, status em $TMP/status
-req() {
-  local t=$1 m=$2 c=$3 b=${4:-} h=${5:-}
-  local args=(-sS -o "$TMP/corpo" -w '%{http_code}' -X "$m" "$GW$c")
-  [ -n "$t" ] && args+=(-H "Authorization: Bearer $t")
-  [ -n "$b" ] && args+=(-H 'Content-Type: application/json' -d "$b")
-  [ -n "$h" ] && args+=(-H "$h")
-  curl "${args[@]}" >"$TMP/status"
-}
-status() { cat "$TMP/status"; }
-corpo()  { cat "$TMP/corpo"; }
-
-# repetir ATÉ_60s: executa o comando até ele devolver 0
-repetir() {
-  local d=$1; shift
-  for _ in $(seq 1 60); do
-    if "$@" >/dev/null 2>&1; then ok "$d"; return 0; fi
-    sleep 1
-  done
-  falha "$d (tempo esgotado)"
-}
+echo "0. auto-cadastro de cliente pelo Keycloak (US01)"
+NOVO="novo-$(date +%s)@pulsepass.test"
+JAR="$TMP/cookies"
+PAGINA=$(curl -fsS -c "$JAR" -b "$JAR" "$KC/realms/pulsepass/protocol/openid-connect/registrations?client_id=pulsepass-api&response_type=code&scope=openid&redirect_uri=http://localhost:3000/")
+ACAO=$(printf '%s' "$PAGINA" | grep -o 'action="[^"]*"' | head -1 | sed 's/^action="//; s/"$//; s/&amp;/\&/g')
+[ -n "$ACAO" ] || falha "formulário de cadastro não encontrado"
+COD=$(curl -sS -o /dev/null -w '%{http_code}' -c "$JAR" -b "$JAR" "$ACAO" \
+  --data-urlencode "email=$NOVO" --data-urlencode "firstName=Novo" --data-urlencode "lastName=Cliente" \
+  --data-urlencode "password=$SENHA" --data-urlencode "password-confirm=$SENHA")
+espero "$COD" 302 "cadastro aceito pelo Keycloak"
+NOVO_TOKEN=$(curl -fsS "$KC/realms/pulsepass/protocol/openid-connect/token" -d grant_type=password -d client_id=pulsepass-api \
+  --data-urlencode "username=$NOVO" --data-urlencode "password=$SENHA" | jq -r .access_token)
+espero "$(printf '%s' "$NOVO_TOKEN" | jq -R 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | @base64d | fromjson | .realm_access.roles | index("cliente") != null')" true "quem se cadastra recebe o papel cliente"
+req "$NOVO_TOKEN" GET /api/ingressos
+espero "$(status)" 200 "o novo cliente já acessa a área de cliente"
 
 echo "1. tokens do Keycloak"
 ORG=$(token organizador); CLI=$(token cliente); OPE=$(token operador)
@@ -54,7 +27,8 @@ for t in "$ORG" "$CLI" "$OPE"; do [ -n "$t" ] && [ "$t" != null ] || falha "toke
 ok "tokens emitidos para organizador, cliente e operador"
 
 echo "2. organizador cadastra evento, lote e setor com 2 assentos"
-req "$ORG" POST /api/eventos '{"nome":"Show de Smoke","local":"Arena","dataHora":"2027-03-01T20:00:00Z"}'
+NOME_EV="Show de Smoke $(date +%s)"
+req "$ORG" POST /api/eventos "{\"nome\":\"$NOME_EV\",\"local\":\"Arena\",\"dataHora\":\"2027-03-01T20:00:00Z\"}"
 espero "$(status)" 201 "criar evento"; EV=$(corpo | jq -r .id)
 req "$ORG" POST "/api/eventos/$EV/lotes" '{"nome":"Pista","preco":250.00,"quantidade":10,"inicioVenda":"2026-01-01T00:00:00Z","fimVenda":"2027-02-01T00:00:00Z"}'
 espero "$(status)" 201 "criar lote"; LOTE=$(corpo | jq -r .id)
@@ -94,9 +68,9 @@ req "$CLI" POST /api/pagamentos "{\"pedidoId\":\"$PED\"}"
 espero "$(status)" 400 "pagamento sem Idempotency-Key"
 
 echo "6. ingresso emitido, PDF e validação na portaria"
-ingresso_emitido() { req "$CLI" GET /api/ingressos && [ "$(corpo | jq 'length')" = 1 ]; }
+ingresso_emitido() { req "$CLI" GET /api/ingressos && [ "$(corpo | jq --arg n "$NOME_EV" 'map(select(.evento_nome==$n))|length')" = 1 ]; }
 repetir "ingresso emitido após PedidoPago" ingresso_emitido
-CODIGO=$(corpo | jq -r '.[0].codigo'); ID=$(corpo | jq -r '.[0].id')
+CODIGO=$(corpo | jq -r --arg n "$NOME_EV" 'map(select(.evento_nome==$n))[0].codigo'); ID=$(corpo | jq -r --arg n "$NOME_EV" 'map(select(.evento_nome==$n))[0].id')
 curl -fsS "$GW/api/ingressos/$ID/pdf" -H "Authorization: Bearer $CLI" -o "$TMP/ingresso.pdf"
 espero "$(head -c 5 "$TMP/ingresso.pdf")" "%PDF-" "PDF do ingresso"
 req "$OPE" POST /api/validacoes "{\"codigo\":\"$CODIGO\"}"
@@ -112,6 +86,25 @@ espero "$(status)" 403 "cliente não valida ingressos"
 echo "7. venda refletida no catálogo"
 assento_vendido() { curl -fsS "$GW/api/eventos/$EV/assentos" | jq -e '.[]|select(.codigo=="A1")|.status=="VENDIDO"'; }
 repetir "AssentoVendido refletido no catálogo" assento_vendido
+
+echo "8. observabilidade: métricas, trace único da compra e dashboard (RNF16)"
+PROM=${PROMETHEUS_URL:-http://localhost:9090}
+JAEGER=${JAEGER_URL:-http://localhost:16686}
+GRAFANA=${GRAFANA_URL:-http://localhost:3001}
+metrica_presente() {
+  curl -fsS -G "$PROM/api/v1/query" --data-urlencode "query=http_server_requests_seconds_count{application=\"checkout-service\"}" \
+    | jq -e '.data.result | length > 0'
+}
+repetir "Prometheus coleta métricas HTTP do checkout-service" metrica_presente
+# um único trace deve conter spans dos quatro serviços (o trace atravessa o Outbox e o Kafka)
+trace_da_compra() {
+  curl -fsS "$JAEGER/api/traces?service=api-gateway&lookback=1h&limit=100" | jq -e '
+    [.data[] | select(([.processes[].serviceName] | unique) as $s
+      | (["api-gateway","checkout-service","emissao-service","inventario-service"] - $s | length) == 0)] | length > 0'
+}
+repetir "um único trace atravessa gateway, checkout, emissão e inventário" trace_da_compra
+curl -fsS "$GRAFANA/api/search?query=PulsePass" | jq -e 'length >= 1' >/dev/null || falha "dashboard do Grafana não provisionado"
+ok "dashboard PulsePass provisionado no Grafana"
 
 echo
 echo "SMOKE OK"
