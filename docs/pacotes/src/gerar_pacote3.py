@@ -83,7 +83,7 @@ html = '''<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>P
   <h2>Checkpoint do Desenvolvimento</h2>
   <p>Estado do código, documentação atualizada dos Pacotes 1 e 2 e evidências de teste</p>
   <p style="margin-top:22mm">Integrantes: Gabriel Kowaleski e Mayra Bordin</p>
-  <p>Repositório: <b>%s</b></p>
+  <p>Repositório: <b>%s</b> (release v0.3.1)</p>
   <p>Entrega: 23 de novembro de 2026</p>
 </div>
 
