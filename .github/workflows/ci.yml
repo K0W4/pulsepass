@@ -42,6 +42,21 @@ jobs:
           path: "**/target/site/jacoco"
           if-no-files-found: ignore
 
+  frontend:
+    name: Front-end (tipos, testes e build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
   build-e-smoke:
     name: 4 e 5. Build das imagens e smoke test do Compose
     runs-on: ubuntu-latest
