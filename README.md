@@ -66,7 +66,8 @@ curl -s -X POST localhost:8080/api/reservas -H "Authorization: Bearer $TOKEN" \
 ```bash
 ./mvnw verify                      # unitários + integração (Testcontainers) + formatação + cobertura >= 70% no domínio
 (cd frontend && npm ci && npm test && npm run build)   # tipos, testes e build da SPA
-./mvnw -Pmutacao -pl services/inventario-service test-compile org.pitest:pitest-maven:mutationCoverage -DskipITs
+./mvnw -q install -DskipTests -pl libs/commons -am   # uma vez: instala a commons no repositório local
+./mvnw -Pmutacao -f services/inventario-service/pom.xml test-compile org.pitest:pitest-maven:mutationCoverage -DskipITs
 ```
 
 Os testes de integração usam PostgreSQL, Redis e Kafka reais via Testcontainers (o Docker precisa
