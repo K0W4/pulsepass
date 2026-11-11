@@ -2,7 +2,7 @@
   "realm": "pulsepass",
   "enabled": true,
   "sslRequired": "none",
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 604800,
   "ssoSessionMaxLifespan": 604800,
@@ -24,6 +24,26 @@
       {
         "name": "admin",
         "description": "Administra a plataforma"
+      },
+      {
+        "name": "offline_access",
+        "description": "${role_offline-access}"
+      },
+      {
+        "name": "uma_authorization",
+        "description": "${role_uma_authorization}"
+      },
+      {
+        "name": "default-roles-pulsepass",
+        "description": "Papéis atribuídos a quem se cadastra",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "cliente",
+            "offline_access",
+            "uma_authorization"
+          ]
+        }
       }
     ]
   },
@@ -117,5 +137,11 @@
         "admin"
       ]
     }
-  ]
+  ],
+  "registrationEmailAsUsername": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "defaultRole": {
+    "name": "default-roles-pulsepass"
+  }
 }
