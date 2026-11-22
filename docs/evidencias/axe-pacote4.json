@@ -1,0 +1,21 @@
+{
+  "ferramenta": "axe-core 4.10.2 (cdnjs), regras wcag2a, wcag2aa, wcag21a, wcag21aa",
+  "data": "2026-11-22",
+  "ambiente": "Compose local, SPA em http://localhost:3000, Chrome (navegador do app), usuários de teste de cada papel",
+  "resultado": "0 violações em todas as telas e estados abaixo",
+  "telas": [
+    {"tela": "#/ (catálogo com busca)", "papel": "anônimo", "violacoes": 0},
+    {"tela": "#/evento/{id} (detalhe)", "papel": "anônimo", "violacoes": 0},
+    {"tela": "#/evento/{id}/assentos (mapa)", "papel": "cliente", "violacoes": 0},
+    {"tela": "#/evento/{id}/assentos (lista)", "papel": "cliente", "violacoes": 0},
+    {"tela": "#/evento/{id}/assentos (painel da fila visível)", "papel": "cliente", "violacoes": 0},
+    {"tela": "#/seja-organizador", "papel": "cliente", "violacoes": 0},
+    {"tela": "#/ingressos", "papel": "cliente", "violacoes": 0},
+    {"tela": "#/admin (com solicitação pendente, auditoria e saúde)", "papel": "admin", "violacoes": 0},
+    {"tela": "#/organizador", "papel": "organizador", "violacoes": 0},
+    {"tela": "#/organizador (painel de vendas ao vivo aberto)", "papel": "organizador", "violacoes": 0},
+    {"tela": "#/portaria", "papel": "operador", "violacoes": 0},
+    {"tela": "#/portaria (resultado de ingresso inválido)", "papel": "operador", "violacoes": 0}
+  ],
+  "limites": "O axe cobre só a parte automatizável da WCAG; a navegação por teclado e o leitor de tela não foram testados à mão. A tela de checkout não entrou nesta rodada. A auditoria é manual e não roda na CI (issue #15)."
+}

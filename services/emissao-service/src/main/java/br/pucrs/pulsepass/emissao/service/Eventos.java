@@ -24,7 +24,22 @@ public final class Eventos {
       String eventoNome,
       List<Item> itens,
       BigDecimal total,
-      Instant pagoEm) {}
+      Instant pagoEm,
+      String clienteEmail) {
+
+    /** Sem e-mail (pedido pago antes do e-mail existir, ou token sem o campo). */
+    public PedidoPago(
+        UUID pedidoId,
+        UUID reservaId,
+        String clienteId,
+        UUID eventoId,
+        String eventoNome,
+        List<Item> itens,
+        BigDecimal total,
+        Instant pagoEm) {
+      this(pedidoId, reservaId, clienteId, eventoId, eventoNome, itens, total, pagoEm, null);
+    }
+  }
 
   public record IngressoEmitido(
       UUID ingressoId,

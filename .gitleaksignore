@@ -1,0 +1,4 @@
+# Falso positivo: a chave de exemplo do RFC 6455 (seção 1.3) usada no handshake de WebSocket do smoke.sh
+# não é um segredo (é um nonce público de documentação). O arquivo já foi corrigido para gerar a chave
+# com `openssl rand -base64 16`; a entrada abaixo cobre só o commit original, que o gitleaks continua lendo.
+7d5119342472bcd3fbc95df5d253a6919f9ef094:scripts/smoke.sh:generic-api-key:190

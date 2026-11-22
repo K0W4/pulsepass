@@ -2,7 +2,9 @@ package br.pucrs.pulsepass.inventario.api;
 
 import br.pucrs.pulsepass.inventario.api.Dtos.ReservaRequest;
 import br.pucrs.pulsepass.inventario.api.Dtos.ReservaResponse;
+import br.pucrs.pulsepass.inventario.service.FilaService;
 import br.pucrs.pulsepass.inventario.service.ReservaService;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,15 +20,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReservaController {
 
   private final ReservaService reservas;
+  private final FilaService fila;
 
-  public ReservaController(ReservaService reservas) {
+  public ReservaController(ReservaService reservas, FilaService fila) {
     this.reservas = reservas;
+    this.fila = fila;
   }
 
   @PostMapping("/reservas")
-  public ResponseEntity<ReservaResponse> reservar(
+  public ResponseEntity<?> reservar(
       @AuthenticationPrincipal Jwt jwt, @RequestBody ReservaRequest r) {
-    var resposta = reservas.reservar(jwt.getSubject(), r.eventoId(), r.assentoIds(), r.itens());
+    // fila virtual (US18): com a fila ligada, só reserva quem foi admitido
+    if (!fila.podeReservar(r.eventoId(), jwt.getSubject())) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("motivo", "FILA_VIRTUAL"));
+    }
+    ReservaResponse resposta =
+        reservas.reservar(jwt.getSubject(), r.eventoId(), r.assentoIds(), r.itens());
+    fila.consumir(r.eventoId(), jwt.getSubject());
     return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
   }
 

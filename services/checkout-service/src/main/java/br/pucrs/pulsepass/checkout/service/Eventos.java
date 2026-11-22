@@ -39,7 +39,8 @@ public final class Eventos {
       String eventoNome,
       List<Item> itens,
       BigDecimal total,
-      Instant pagoEm) {}
+      Instant pagoEm,
+      String clienteEmail) {}
 
   public record PagamentoRecusado(
       UUID pedidoId, UUID reservaId, String motivo, Instant ocorridoEm) {}

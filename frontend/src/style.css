@@ -93,3 +93,15 @@ input[type='number'] { max-width: 8rem; min-height: 44px; font: inherit; }
 @media (prefers-reduced-motion: no-preference) {
   .botao, .botao-sec, .assento { transition: background-color 0.15s; }
 }
+
+/* Pacote 4: busca, fila virtual, tempo real, painéis e câmera */
+.busca { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin: 0 0 1rem; padding: 0.75rem; border: 1px solid var(--borda); border-radius: 8px; }
+.busca .campo-busca { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.busca input { font: inherit; padding: 0.4rem 0.5rem; border: 1px solid var(--borda); border-radius: 6px; }
+.fila { padding: 0.75rem 1rem; border-radius: 8px; background: var(--alerta-fundo); color: var(--alerta-texto); font-weight: 600; }
+.fila[hidden], .camera[hidden] { display: none; }
+.camera { width: 100%; max-width: 420px; border-radius: 8px; border: 2px solid var(--azul); }
+.painel { border: 1px solid var(--borda); border-radius: 8px; margin: 1rem 0; padding: 0.75rem 1rem; }
+.painel legend { font-weight: 700; color: var(--azul); padding: 0 0.4rem; }
+.painel .barra input[type="text"] { font: inherit; padding: 0.35rem 0.5rem; border: 1px solid var(--borda); border-radius: 6px; }
+.tabela caption { text-align: left; font-weight: 600; padding: 0.25rem 0; }

@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: telemetria-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/db_telemetria}
+    username: ${DB_USER:pulsepass}
+    password: ${DB_PASSWORD:pulsepass}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    listener:
+      observation-enabled: true
+    consumer:
+      group-id: telemetria-dominio
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 8000
+        max.block.ms: 4000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWK_SET_URI:http://localhost:8081/realms/pulsepass/protocol/openid-connect/certs}
+telemetria:
+  # usado só pelo painel operacional (US33); se estiver fora, o painel diz que não há dados
+  prometheus-url: ${PROMETHEUS_URL:http://localhost:9090}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+logging:
+  structured:
+    format:
+      console: ecs

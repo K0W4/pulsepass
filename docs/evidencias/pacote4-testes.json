@@ -1,0 +1,153 @@
+{
+  "modulos": {
+    "libs/commons": {
+      "unitarios": {
+        "testes": 1,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 0,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": null,
+      "mutacao": null
+    },
+    "services/api-gateway": {
+      "unitarios": {
+        "testes": 11,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 0,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": null,
+      "mutacao": null
+    },
+    "services/inventario-service": {
+      "unitarios": {
+        "testes": 15,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 23,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": 100.0,
+      "mutacao": {
+        "mortos": 40,
+        "total": 40
+      }
+    },
+    "services/checkout-service": {
+      "unitarios": {
+        "testes": 7,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 9,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": 100.0,
+      "mutacao": {
+        "mortos": 18,
+        "total": 18
+      }
+    },
+    "services/emissao-service": {
+      "unitarios": {
+        "testes": 7,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 11,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": 93.9,
+      "mutacao": {
+        "mortos": 13,
+        "total": 13
+      }
+    },
+    "services/gateway-pagamento": {
+      "unitarios": {
+        "testes": 3,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 0,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": null,
+      "mutacao": null
+    },
+    "services/iam-service": {
+      "unitarios": {
+        "testes": 11,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 7,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": 100.0,
+      "mutacao": {
+        "mortos": 28,
+        "total": 28
+      }
+    },
+    "services/telemetria-service": {
+      "unitarios": {
+        "testes": 8,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 7,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": 100.0,
+      "mutacao": {
+        "mortos": 24,
+        "total": 24
+      }
+    },
+    "services/realtime-service": {
+      "unitarios": {
+        "testes": 6,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "integracao": {
+        "testes": 5,
+        "falhas": 0,
+        "ignorados": 0
+      },
+      "cobertura_dominio_linhas": 100.0,
+      "mutacao": {
+        "mortos": 18,
+        "total": 18
+      }
+    }
+  },
+  "totais": {
+    "unitarios": 69,
+    "integracao": 62,
+    "falhas": 0
+  }
+}

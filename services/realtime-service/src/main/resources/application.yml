@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: realtime-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      auto-offset-reset: latest
+realtime:
+  jwk-set-uri: ${JWK_SET_URI:http://localhost:8081/realms/pulsepass/protocol/openid-connect/certs}
+server:
+  port: 8080
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+logging:
+  structured:
+    format:
+      console: ecs

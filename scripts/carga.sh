@@ -5,6 +5,16 @@ set -uo pipefail
 . "$(dirname "$0")/lib.sh"
 mkdir -p docs/evidencias
 K6=grafana/k6:0.54.0
+# O rate limit (100 req/s por cliente) protege o gateway de um cliente só; o k6 sai de um único
+# cliente, então o limite sobe durante a medição e volta ao padrão no fim.
+export RATELIMIT_RPS=1000000 RATELIMIT_BURST=1000000
+docker compose up -d --no-deps --wait api-gateway >/dev/null 2>&1
+# o gateway acabou de reiniciar (JVM fria): aquece o caminho do catálogo antes de medir, para a medição
+# ser a do serviço em regime e não a do carregamento de classes
+echo "aquecendo o gateway e o inventário (6.000 requisições)"
+seq 1 6000 | xargs -P 30 -I{} curl -s -o /dev/null "$GW/api/eventos"
+restaurar_limite() { unset RATELIMIT_RPS RATELIMIT_BURST; docker compose up -d --no-deps --wait api-gateway >/dev/null 2>&1; }
+trap 'restaurar_limite; rm -rf "$TMP"' EXIT
 rodar() { # rodar NOME
   local nome=$1 saida=docs/evidencias/k6-$1.json
   docker run --rm -i --network pulsepass_default \

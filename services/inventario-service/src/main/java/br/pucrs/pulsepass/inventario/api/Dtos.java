@@ -9,7 +9,16 @@ public final class Dtos {
 
   private Dtos() {}
 
-  public record EventoRequest(String nome, String local, Instant dataHora, String imagemUrl) {}
+  /** {@code publicar} nulo ou true publica na criação; false cria como rascunho (US10). */
+  public record EventoRequest(
+      String nome, String local, Instant dataHora, String imagemUrl, Boolean publicar) {
+
+    public EventoRequest(String nome, String local, Instant dataHora, String imagemUrl) {
+      this(nome, local, dataHora, imagemUrl, null);
+    }
+  }
+
+  public record FilaRequest(boolean ativa) {}
 
   public record LoteRequest(
       String nome, BigDecimal preco, int quantidade, Instant inicioVenda, Instant fimVenda) {}

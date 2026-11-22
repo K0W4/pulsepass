@@ -48,6 +48,11 @@ export function sair(): void {
   void kc.logout({ redirectUri: `${location.origin}/` });
 }
 
+/** Força um refresh token já: o novo token traz os papéis atuais (ex.: depois de virar organizador). */
+export async function renovarSessao(): Promise<boolean> {
+  return kc.updateToken(-1).catch(() => false);
+}
+
 export async function token(): Promise<string | undefined> {
   if (!kc.authenticated) return undefined;
   await kc.updateToken(30).catch(() => undefined);

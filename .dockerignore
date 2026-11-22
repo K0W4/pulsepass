@@ -1,5 +1,19 @@
+# O contexto das imagens dos serviços só precisa dos pom.xml, de libs/ e de services/ (o front-end
+# tem o próprio Dockerfile e contexto). Fora daqui, editar documentação ou scripts não invalida o
+# cache do build do Maven.
 **/target
+**/node_modules
 .git
 .env
+.env.*
 *.md
 docs
+specs
+scripts
+frontend
+.github
+.claude
+infra/keycloak
+infra/observabilidade
+infra/kafka
+infra/postgres

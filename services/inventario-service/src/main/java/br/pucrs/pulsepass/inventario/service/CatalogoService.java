@@ -1,6 +1,7 @@
 package br.pucrs.pulsepass.inventario.service;
 
 import br.pucrs.pulsepass.common.NaoEncontrado;
+import br.pucrs.pulsepass.inventario.domain.FiltroCatalogo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,18 @@ public class CatalogoService {
       log.warn("Não foi possível gravar o cache do catálogo: {}", e.toString());
     }
     return lista;
+  }
+
+  /** Busca (US13): filtra a lista em cache, sem nova consulta ao banco. */
+  public List<Map<String, Object>> eventos(FiltroCatalogo.Criterios criterios) {
+    return FiltroCatalogo.aplicar(eventos(), criterios);
+  }
+
+  /** Eventos do organizador, inclusive rascunhos (US10). */
+  public List<Map<String, Object>> meus(String organizadorId) {
+    return jdbc.queryForList(
+        "select id, nome, local, data_hora, imagem_url, status, fila_ativa from evento where organizador_id = ? order by data_hora",
+        organizadorId);
   }
 
   public void invalidar() {
