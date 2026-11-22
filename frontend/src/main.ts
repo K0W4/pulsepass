@@ -2,8 +2,11 @@ import './style.css';
 import { cadastrar, entrar, iniciar, logado, sair, temPapel, usuario } from './auth';
 import { catalogo, detalhe, mapaDeAssentos } from './catalogo';
 import { checkout, meusIngressos } from './compra';
+import { admin } from './admin';
+import { soliciteOrganizador } from './conta';
 import { aviso, h, limparTela } from './dom';
 import { organizador, portaria } from './papeis';
+import { paginaDaRota } from './util';
 
 type Tela = (partes: string[]) => HTMLElement | Promise<HTMLElement>;
 
@@ -22,13 +25,30 @@ const rotas: Rota[] = [
   { padrao: /^\/ingressos$/, titulo: 'Meus ingressos', papel: 'cliente', tela: () => meusIngressos() },
   { padrao: /^\/organizador$/, titulo: 'Área do organizador', papel: 'organizador', tela: () => organizador() },
   { padrao: /^\/portaria$/, titulo: 'Portaria', papel: 'operador', tela: () => portaria() },
+  { padrao: /^\/seja-organizador$/, titulo: 'Quero ser organizador', papel: 'cliente', tela: () => soliciteOrganizador() },
+  { padrao: /^\/admin$/, titulo: 'Administração', papel: 'admin', tela: () => admin() },
 ];
+
+/** Telemetria de navegação (US32): só o nome da tela, de uma lista fechada, sem identificar a pessoa. */
+let ultimoCaminho = '';
+function registrarNavegacao(caminho: string): void {
+  if (caminho === ultimoCaminho) return; // redesenhar a mesma tela não é outra visita
+  ultimoCaminho = caminho;
+  void fetch('/api/telemetria/navegacao', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pagina: paginaDaRota(caminho) }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
 
 function desenharMenu(): void {
   const itens: HTMLElement[] = [h('a', { href: '#/' }, 'Eventos')];
   if (temPapel('cliente')) itens.push(h('a', { href: '#/ingressos' }, 'Meus ingressos'));
   if (temPapel('organizador')) itens.push(h('a', { href: '#/organizador' }, 'Organizador'));
   if (temPapel('operador')) itens.push(h('a', { href: '#/portaria' }, 'Portaria'));
+  if (temPapel('cliente') && !temPapel('organizador')) itens.push(h('a', { href: '#/seja-organizador' }, 'Quero ser organizador'));
+  if (temPapel('admin')) itens.push(h('a', { href: '#/admin' }, 'Administração'));
   if (logado()) {
     itens.push(h('span', { class: 'usuario' }, usuario()), h('button', { class: 'botao-sec', type: 'button', onclick: sair }, 'Sair'));
   } else {
@@ -42,6 +62,7 @@ async function navegar(): Promise<void> {
   limparTela();
   aviso('', 'info');
   const caminho = location.hash.replace(/^#/, '') || '/';
+  registrarNavegacao(caminho);
   const principal = document.getElementById('conteudo') as HTMLElement;
   let conteudo: HTMLElement;
   let titulo = 'Página não encontrada';

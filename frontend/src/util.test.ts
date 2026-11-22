@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  agruparPorSetor, gerarCodigos, mmss, papeis, rotuloAssento, segundosRestantes, totalSelecionado,
-  type Assento,
+  agruparPorSetor, aplicarAssentoMudou, cnpjFormatado, esperaDeReconexao, gerarCodigos, mmss, paginaDaRota, papeis,
+  parametrosBusca, rotuloAssento, rotuloMetrica, segundosRestantes, statusDoPedido, textoDaFila, totalSelecionado,
+  urlDoCanal, type Assento,
 } from './util';
 
 const a = (id: string, codigo: string, setor: string, status: Assento['status'] = 'LIVRE', preco = 100): Assento =>
@@ -50,5 +51,77 @@ describe('util', () => {
 
   it('descreve o assento para leitores de tela', () => {
     expect(rotuloAssento(a('1', 'A10', 'Setor A', 'VENDIDO', 250))).toContain('Setor A, assento A10, vendido');
+  });
+});
+
+describe('tempo real', () => {
+  it('aplica a mudança de um assento sem alterar os outros nem a lista original', () => {
+    const lista = [a('1', 'A1', 'S'), a('2', 'A2', 'S')];
+    const nova = aplicarAssentoMudou(lista, { assentoId: '2', status: 'RESERVADO' });
+    expect(nova.map((x) => x.status)).toEqual(['LIVRE', 'RESERVADO']);
+    expect(lista[1].status).toBe('LIVRE');
+  });
+
+  it('ignora status desconhecido e assento que não está no mapa', () => {
+    const lista = [a('1', 'A1', 'S')];
+    expect(aplicarAssentoMudou(lista, { assentoId: '1', status: 'QUALQUER' })).toBe(lista);
+    expect(aplicarAssentoMudou(lista, { assentoId: '9', status: 'VENDIDO' }).map((x) => x.status)).toEqual(['LIVRE']);
+  });
+
+  it('monta o endereço do WebSocket, com ws ou wss e o token codificado', () => {
+    expect(urlDoCanal({ protocol: 'http:', host: 'localhost:3000' }, '/eventos/abc')).toBe('ws://localhost:3000/api/realtime/eventos/abc');
+    expect(urlDoCanal({ protocol: 'https:', host: 'pulsepass.test' }, '/pedidos/p', 'a b+c')).toBe('wss://pulsepass.test/api/realtime/pedidos/p?token=a%20b%2Bc');
+  });
+
+  it('recua de forma exponencial até 30 s', () => {
+    expect([0, 1, 2, 3, 4].map(esperaDeReconexao)).toEqual([1000, 2000, 4000, 8000, 16000]);
+    expect(esperaDeReconexao(5)).toBe(30000);
+    expect(esperaDeReconexao(50)).toBe(30000);
+    expect(esperaDeReconexao(-3)).toBe(1000);
+  });
+
+  it('traduz o evento do pedido em texto, e ignora os que não mudam a tela', () => {
+    expect(statusDoPedido('PedidoPago')).toContain('aprovado');
+    expect(statusDoPedido('IngressoEmitido')).toContain('emitidos');
+    expect(statusDoPedido('PagamentoRecusado')).toContain('recusado');
+    expect(statusDoPedido('PedidoReservado')).toBeNull();
+  });
+});
+
+describe('busca, fila e navegação', () => {
+  it('monta a query da busca sem campos vazios', () => {
+    expect(parametrosBusca({})).toBe('');
+    expect(parametrosBusca({ q: '  rock ', local: '', de: '2027-03-10' })).toBe('?q=rock&de=2027-03-10');
+    expect(parametrosBusca({ q: 'a&b' })).toBe('?q=a%26b');
+  });
+
+  it('descreve a situação na fila', () => {
+    expect(textoDaFila({ status: 'AGUARDANDO', posicao: 12 })).toContain('posição 12');
+    expect(textoDaFila({ status: 'ADMITIDO' })).toContain('Sua vez chegou');
+    expect(textoDaFila({ status: 'FORA' })).toContain('não está na fila');
+  });
+
+  it('classifica a tela numa lista fechada, sem vazar identificadores', () => {
+    expect(paginaDaRota('/')).toBe('catalogo');
+    expect(paginaDaRota('/evento/9f1c-22')).toBe('evento');
+    expect(paginaDaRota('/evento/9f1c-22/assentos')).toBe('assentos');
+    expect(paginaDaRota('/checkout/9f1c-22')).toBe('checkout');
+    expect(paginaDaRota('/ingressos')).toBe('ingressos');
+    expect(paginaDaRota('/organizador')).toBe('organizador');
+    expect(paginaDaRota('/portaria')).toBe('portaria');
+    expect(paginaDaRota('/admin')).toBe('admin');
+    expect(paginaDaRota('/qualquer/coisa')).toBe('outra');
+  });
+
+  it('formata o CNPJ numérico e o alfanumérico', () => {
+    expect(cnpjFormatado('11222333000181')).toBe('11.222.333/0001-81');
+    expect(cnpjFormatado('12abc34501de35')).toBe('12.ABC.345/01DE-35');
+    expect(cnpjFormatado('curto')).toBe('curto');
+  });
+
+  it('dá nome legível às métricas', () => {
+    expect(rotuloMetrica('pedidos_pagos')).toBe('Pedidos pagos');
+    expect(rotuloMetrica('pagina.catalogo')).toBe('Tela: catalogo');
+    expect(rotuloMetrica('desconhecida')).toBe('desconhecida');
   });
 });

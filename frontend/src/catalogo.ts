@@ -1,28 +1,57 @@
 import { chamar, mensagemDeErro } from './api';
 import { aoSair, aviso, h } from './dom';
-import { agruparPorSetor, dataHora, reais, rotuloAssento, totalSelecionado, type Assento } from './util';
+import { abrirCanal } from './tempo-real';
+import {
+  agruparPorSetor, aplicarAssentoMudou, dataHora, parametrosBusca, reais, rotuloAssento, textoDaFila, totalSelecionado,
+  type Assento,
+} from './util';
 
 interface Evento { id: string; nome: string; local: string; data_hora: string }
 interface Lote { id: string; nome: string; preco: number; inicio_venda: string; fim_venda: string; disponivel: number }
+interface SituacaoFila { status: string; posicao?: number }
 
+/** US11 e US13: lista os eventos e permite buscar por nome, local e data. */
 export async function catalogo(): Promise<HTMLElement> {
-  const r = await chamar<Evento[]>('GET', '/eventos');
   const raiz = h('section', {}, h('h1', { tabindex: -1 }, 'Eventos'));
-  if (r.status !== 200) {
-    aviso(mensagemDeErro(r.status), 'erro');
-    return raiz;
+  const resultados = h('div', { 'aria-live': 'polite' });
+
+  async function buscar(filtros: { q?: string; local?: string; de?: string; ate?: string }): Promise<void> {
+    const filtrado = parametrosBusca(filtros) !== '';
+    const r = await chamar<Evento[]>('GET', `/eventos${parametrosBusca(filtros)}`);
+    if (r.status !== 200) {
+      aviso(mensagemDeErro(r.status), 'erro');
+      return;
+    }
+    aviso('', 'info');
+    resultados.replaceChildren(
+      r.dados.length === 0
+        ? h('p', {}, filtrado ? 'Nenhum evento encontrado para essa busca.' : 'Nenhum evento publicado ainda.')
+        : h('ul', { class: 'lista-cartoes' },
+            r.dados.map((e) =>
+              h('li', { class: 'cartao' },
+                h('h2', {}, h('a', { href: `#/evento/${e.id}` }, e.nome)),
+                h('p', {}, `${e.local} · ${dataHora(e.data_hora)}`)))));
   }
-  if (r.dados.length === 0) {
-    raiz.append(h('p', {}, 'Nenhum evento publicado ainda.'));
-    return raiz;
-  }
-  raiz.append(
-    h('ul', { class: 'lista-cartoes' },
-      r.dados.map((e) =>
-        h('li', { class: 'cartao' },
-          h('h2', {}, h('a', { href: `#/evento/${e.id}` }, e.nome)),
-          h('p', {}, `${e.local} · ${dataHora(e.data_hora)}`)))),
-  );
+
+  const campo = (id: string, rotulo: string, tipo = 'search'): HTMLElement =>
+    h('p', { class: 'campo-busca' }, h('label', { htmlFor: id }, rotulo), h('input', { id, name: id, type: tipo }));
+  const valor = (f: HTMLFormElement, n: string): string => (f.elements.namedItem(n) as HTMLInputElement).value;
+
+  const form = h('form', {
+    class: 'busca', role: 'search', 'aria-label': 'Buscar eventos',
+    onsubmit: (e: Event) => {
+      e.preventDefault();
+      const f = e.target as HTMLFormElement;
+      void buscar({ q: valor(f, 'q'), local: valor(f, 'local'), de: valor(f, 'de'), ate: valor(f, 'ate') });
+    },
+    onreset: () => void buscar({}),
+  },
+  campo('q', 'Nome do evento'), campo('local', 'Cidade ou local'), campo('de', 'A partir de', 'date'), campo('ate', 'Até', 'date'),
+  h('button', { class: 'botao', type: 'submit' }, 'Buscar'),
+  h('button', { class: 'botao-sec', type: 'reset' }, 'Limpar'));
+
+  raiz.append(form, resultados);
+  await buscar({});
   return raiz;
 }
 
@@ -69,9 +98,12 @@ export async function mapaDeAssentos(id: string): Promise<HTMLElement> {
   const selecionados = new Set<string>();
   const quantidades = new Map<string, number>();
   let modo: 'mapa' | 'lista' = 'mapa';
+  let tempoReal = false;
 
   const resumo = h('p', { class: 'resumo', 'aria-live': 'polite' });
   const area = h('div', {});
+  const estadoTempoReal = h('p', { class: 'nota', role: 'status' }, 'Conectando ao tempo real...');
+  const painelFila = h('p', { class: 'fila', role: 'status', hidden: true });
   const botaoReservar = h('button', { class: 'botao', type: 'button', onclick: () => void reservar() }, 'Reservar');
 
   function atualizarResumo(): void {
@@ -145,15 +177,47 @@ export async function mapaDeAssentos(id: string): Promise<HTMLElement> {
     desenhar();
   }
 
-  async function reservar(): Promise<void> {
+  /** US18: com a fila ligada, a reserva é negada até a vez do cliente; ao ser admitido, reserva sozinho. */
+  async function entrarNaFila(): Promise<void> {
+    const f = await chamar<SituacaoFila>('POST', `/eventos/${id}/fila`);
+    if (f.status !== 200) {
+      aviso(mensagemDeErro(f.status), 'erro');
+      botaoReservar.disabled = false;
+      return;
+    }
+    painelFila.hidden = false;
+    painelFila.textContent = textoDaFila(f.dados);
+    botaoReservar.disabled = true;
+    const consultar = async (): Promise<void> => {
+      const s = await chamar<SituacaoFila>('GET', `/eventos/${id}/fila`);
+      if (s.status !== 200) return;
+      painelFila.textContent = textoDaFila(s.dados);
+      if (s.dados.status === 'ADMITIDO') {
+        window.clearInterval(espera);
+        await reservar(true);
+      }
+    };
+    const espera = window.setInterval(() => void consultar(), 2000);
+    aoSair(() => window.clearInterval(espera));
+    if (f.dados.status === 'ADMITIDO') {
+      window.clearInterval(espera);
+      await reservar(true);
+    }
+  }
+
+  async function reservar(aposAdmissao = false): Promise<void> {
     botaoReservar.disabled = true;
     const itens = lotesDePista.filter((l) => (quantidades.get(l.id) ?? 0) > 0).map((l) => ({ loteId: l.id, quantidade: quantidades.get(l.id) ?? 0 }));
-    const r = await chamar<{ reservaId: string }>('POST', '/reservas', {
+    const r = await chamar<{ reservaId?: string; motivo?: string }>('POST', '/reservas', {
       corpo: { eventoId: id, assentoIds: [...selecionados], itens },
     });
-    if (r.status === 201) {
+    if (r.status === 201 && r.dados.reservaId) {
       aviso('', 'info');
       location.hash = `#/checkout/${r.dados.reservaId}`;
+      return;
+    }
+    if (r.status === 403 && r.dados?.motivo === 'FILA_VIRTUAL' && !aposAdmissao) {
+      await entrarNaFila();
       return;
     }
     aviso(r.status === 409 ? 'Um dos ingressos acabou de ser reservado. Escolha outro.' : mensagemDeErro(r.status), 'erro');
@@ -161,8 +225,33 @@ export async function mapaDeAssentos(id: string): Promise<HTMLElement> {
     await recarregar();
   }
 
-  const tempo = window.setInterval(() => void recarregar(), 5000);
-  aoSair(() => window.clearInterval(tempo));
+  // tempo real (US14): cada mudança de assento chega pelo WebSocket; o polling vira rede de segurança
+  abrirCanal(`/eventos/${id}`, {
+    aoMensagem: (m) => {
+      const antes = assentos;
+      assentos = aplicarAssentoMudou(assentos, m);
+      if (assentos === antes) return;
+      const perdidos = [...selecionados].filter((s) => assentos.find((a) => a.id === s)?.status !== 'LIVRE');
+      perdidos.forEach((s) => selecionados.delete(s));
+      if (perdidos.length > 0) aviso('Um assento que você escolheu foi reservado por outra pessoa.', 'erro');
+      desenhar();
+    },
+    aoMudarEstado: (conectado) => {
+      tempoReal = conectado;
+      estadoTempoReal.textContent = conectado
+        ? 'Disponibilidade em tempo real.'
+        : 'Sem conexão em tempo real; atualizando a cada 5 segundos.';
+    },
+  });
+  let proxima: number | undefined;
+  const agendar = (): void => {
+    proxima = window.setTimeout(async () => {
+      await recarregar();
+      agendar();
+    }, tempoReal ? 30_000 : 5_000);
+  };
+  agendar();
+  aoSair(() => window.clearTimeout(proxima));
 
   desenhar();
   return h('section', {},
@@ -182,6 +271,6 @@ export async function mapaDeAssentos(id: string): Promise<HTMLElement> {
         },
       }, 'Ver como lista'),
       h('button', { class: 'botao-sec', type: 'button', onclick: () => void recarregar() }, 'Atualizar disponibilidade')),
-    area, resumo, botaoReservar,
-    h('p', { class: 'nota' }, 'A reserva dura 10 minutos. A disponibilidade é atualizada a cada 5 segundos.'));
+    area, resumo, painelFila, botaoReservar, estadoTempoReal,
+    h('p', { class: 'nota' }, 'A reserva dura 10 minutos.'));
 }

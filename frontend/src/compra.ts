@@ -1,7 +1,8 @@
 import QRCode from 'qrcode';
 import { baixarPdf, chamar, mensagemDeErro } from './api';
 import { aoSair, aviso, h } from './dom';
-import { dataHora, mmss, reais, segundosRestantes } from './util';
+import { abrirCanal } from './tempo-real';
+import { dataHora, mmss, reais, segundosRestantes, statusDoPedido } from './util';
 
 interface Item { assento_id: string | null; descricao: string; quantidade: number; preco_unitario: number }
 interface Pedido { id: string; reserva_id: string; status: string; total: number; expira_em: string | null; itens: Item[] }
@@ -32,6 +33,19 @@ export async function checkout(reservaId: string): Promise<HTMLElement> {
   const expiraEm = pedido.expira_em;
   const relogio = h('strong', { role: 'timer' });
   const resultado = h('div', { 'aria-live': 'polite' });
+  const estadoPedido = h('p', { class: 'nota', role: 'status' });
+
+  // status do pedido em tempo real (US27): o WebSocket avisa cada passo e o fim da emissão
+  let ingressoEmitido: () => void = () => undefined;
+  const emitido = new Promise<void>((resolver) => { ingressoEmitido = resolver; });
+  abrirCanal(`/pedidos/${pedido.id}`, {
+    comToken: true,
+    aoMensagem: (m) => {
+      const texto = statusDoPedido(String(m.tipo));
+      if (texto) estadoPedido.textContent = texto;
+      if (m.tipo === 'IngressoEmitido') ingressoEmitido();
+    },
+  });
   const botaoPagar = h('button', { class: 'botao', type: 'button', onclick: () => void pagar() }, `Pagar ${reais(pedido.total)}`);
   const botaoCancelar = h('button', { class: 'botao-sec', type: 'button', onclick: () => void cancelar() }, 'Cancelar reserva');
   let chave = crypto.randomUUID();
@@ -73,7 +87,8 @@ export async function checkout(reservaId: string): Promise<HTMLElement> {
           location.hash = '#/ingressos';
           return;
         }
-        await esperar(1000);
+        // o polling de 1 s é a rede de segurança; com o WebSocket o aviso chega na hora
+        await Promise.race([esperar(1000), emitido.then(() => esperar(150))]);
       }
       aviso('Pagamento aprovado. Seus ingressos aparecem em "Meus ingressos" em instantes.', 'ok');
       return;
@@ -97,7 +112,7 @@ export async function checkout(reservaId: string): Promise<HTMLElement> {
         h('tr', {}, h('th', { scope: 'row' }, i.descricao), h('td', {}, String(i.quantidade)), h('td', {}, reais(i.preco_unitario)))))),
     h('p', { class: 'total' }, `Total: ${reais(pedido.total)}`),
     h('div', { class: 'barra' }, botaoPagar, botaoCancelar),
-    resultado);
+    estadoPedido, resultado);
   return raiz;
 }
 
