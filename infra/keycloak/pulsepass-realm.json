@@ -62,6 +62,17 @@
         "*"
       ],
       "fullScopeAllowed": true
+    },
+    {
+      "clientId": "pulsepass-iam",
+      "name": "PulsePass IAM (conta de serviço)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "iam-dev-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect"
     }
   ],
   "users": [
@@ -136,6 +147,20 @@
       "realmRoles": [
         "admin"
       ]
+    },
+    {
+      "username": "service-account-pulsepass-iam",
+      "enabled": true,
+      "serviceAccountClientId": "pulsepass-iam",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "view-events",
+          "view-realm"
+        ]
+      }
     }
   ],
   "registrationEmailAsUsername": true,
@@ -143,5 +168,20 @@
   "loginWithEmailAllowed": true,
   "defaultRole": {
     "name": "default-roles-pulsepass"
-  }
+  },
+  "eventsEnabled": true,
+  "eventsExpiration": 604800,
+  "eventsListeners": [
+    "jboss-logging"
+  ],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "REGISTER",
+    "UPDATE_PASSWORD",
+    "RESET_PASSWORD",
+    "UPDATE_EMAIL"
+  ],
+  "adminEventsEnabled": false
 }

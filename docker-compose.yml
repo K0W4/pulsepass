@@ -81,6 +81,17 @@ services:
     depends_on:
       kafka: { condition: service_healthy }
 
+  # caixa de entrada de desenvolvimento: recebe os e-mails dos ingressos (SMTP 1025, UI 8025)
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports:
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     command: ["start-dev", "--import-realm"]
@@ -108,6 +119,10 @@ services:
       - "16686:16686"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+      # o armazenamento em memória não tem limite por padrão: depois de um teste de carga ele chegava a
+      # 170% de CPU e 1,2 GB (e, com 12 réplicas, foi morto por falta de memória na VM de 8 GB do Docker).
+      # Guarda só os últimos traces; o smoke procura apenas os mais recentes.
+      MEMORY_MAX_TRACES: "3000"
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.111.0
@@ -206,6 +221,64 @@ services:
       KAFKA_BOOTSTRAP: kafka:19092
       JWK_SET_URI: http://keycloak:8080/realms/pulsepass/protocol/openid-connect/certs
       EMISSAO_QR_SECRET: ${EMISSAO_QR_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    healthcheck:
+      <<: *saude
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+
+  iam-service:
+    <<: *servico
+    build: { context: ., dockerfile: infra/Dockerfile.service, args: { MODULE: iam-service } }
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+    environment:
+      OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      DB_URL: jdbc:postgresql://postgres:5432/db_iam
+      DB_USER: ${POSTGRES_USER:-pulsepass}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-pulsepass-dev}
+      KAFKA_BOOTSTRAP: kafka:19092
+      JWK_SET_URI: http://keycloak:8080/realms/pulsepass/protocol/openid-connect/certs
+      KEYCLOAK_URL: http://keycloak:8080
+      # conta de serviço do realm importado; segredo SÓ de desenvolvimento
+      IAM_CLIENT_SECRET: ${IAM_CLIENT_SECRET:-iam-dev-secret}
+    healthcheck:
+      <<: *saude
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+
+  telemetria-service:
+    <<: *servico
+    build: { context: ., dockerfile: infra/Dockerfile.service, args: { MODULE: telemetria-service } }
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+    environment:
+      OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      DB_URL: jdbc:postgresql://postgres:5432/db_telemetria
+      DB_USER: ${POSTGRES_USER:-pulsepass}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-pulsepass-dev}
+      KAFKA_BOOTSTRAP: kafka:19092
+      JWK_SET_URI: http://keycloak:8080/realms/pulsepass/protocol/openid-connect/certs
+      PROMETHEUS_URL: http://prometheus:9090
+    healthcheck:
+      <<: *saude
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+
+  realtime-service:
+    <<: *servico
+    build: { context: ., dockerfile: infra/Dockerfile.service, args: { MODULE: realtime-service } }
+    depends_on:
+      kafka: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+    environment:
+      KAFKA_BOOTSTRAP: kafka:19092
+      JWK_SET_URI: http://keycloak:8080/realms/pulsepass/protocol/openid-connect/certs
     healthcheck:
       <<: *saude
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
@@ -219,12 +292,21 @@ services:
       inventario-service: { condition: service_healthy }
       checkout-service: { condition: service_healthy }
       emissao-service: { condition: service_healthy }
+      iam-service: { condition: service_healthy }
+      telemetria-service: { condition: service_healthy }
+      realtime-service: { condition: service_healthy }
     environment:
       OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
       JWK_SET_URI: http://keycloak:8080/realms/pulsepass/protocol/openid-connect/certs
       INVENTARIO_URL: http://inventario-service:8080
       CHECKOUT_URL: http://checkout-service:8080
       EMISSAO_URL: http://emissao-service:8080
+      IAM_URL: http://iam-service:8080
+      TELEMETRIA_URL: http://telemetria-service:8080
+      REALTIME_URL: http://realtime-service:8080
+      # rate limit por cliente (US: pacote 2, gateway); o carga.sh sobe o limite durante o teste
+      RATELIMIT_RPS: ${RATELIMIT_RPS:-100}
+      RATELIMIT_BURST: ${RATELIMIT_BURST:-200}
     healthcheck:
       <<: *saude
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]

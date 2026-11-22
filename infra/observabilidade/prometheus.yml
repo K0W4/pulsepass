@@ -5,7 +5,14 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     # descoberta por DNS: encontra todas as réplicas de cada serviço (RNF09)
     dns_sd_configs:
-      - names: [api-gateway, inventario-service, checkout-service, emissao-service]
+      - names:
+          - api-gateway
+          - inventario-service
+          - checkout-service
+          - emissao-service
+          - iam-service
+          - telemetria-service
+          - realtime-service
         type: A
         port: 8080
       - names: [gateway-pagamento]

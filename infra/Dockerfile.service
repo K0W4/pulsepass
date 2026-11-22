@@ -4,7 +4,9 @@ FROM eclipse-temurin:21-jdk AS build
 ARG MODULE
 WORKDIR /src
 COPY . .
-RUN --mount=type=cache,target=/root/.m2 \
+# sharing=locked: as imagens são construídas em paralelo e o cache do Maven (inclusive o download do
+# próprio Maven pelo wrapper) não aguenta escritas simultâneas; o passo passa a ser serializado
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
     ./mvnw -B -q -pl services/${MODULE} -am package -DskipTests -Dspotless.check.skip=true
 
 FROM eclipse-temurin:21-jre
@@ -14,4 +16,9 @@ RUN useradd --system --uid 10001 app
 USER app
 WORKDIR /app
 COPY --from=build /src/services/${MODULE}/target/*.jar app.jar
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+# O Compose sobe até 14 JVMs (2 réplicas de 6 serviços, gateway e simulador) numa VM de Docker de 8 GB.
+# Com o heap padrão cada uma passava de 400 MB e o kernel matava o Keycloak ou o Jaeger. Heap limitado,
+# GC serial (sem threads de GC em excesso), pilhas e cache de código menores: ~100 MB a menos por serviço.
+# Pode ser trocado por JAVA_TOOL_OPTIONS no ambiente do contêiner.
+ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -Xms64m -Xmx384m -Xss512k -XX:ReservedCodeCacheSize=64m -XX:MaxMetaspaceSize=192m"
+ENTRYPOINT ["java", "-jar", "app.jar"]
