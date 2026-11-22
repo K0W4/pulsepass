@@ -24,6 +24,9 @@
     <module>services/emissao-service</module>
     <module>services/gateway-pagamento</module>
     <module>services/api-gateway</module>
+    <module>services/realtime-service</module>
+    <module>services/telemetria-service</module>
+    <module>services/iam-service</module>
   </modules>
 
   <properties>
