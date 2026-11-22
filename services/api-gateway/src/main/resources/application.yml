@@ -33,6 +33,29 @@ spring:
                 - Path=/api/ingressos/**,/api/validacoes/**
               filters:
                 - StripPrefix=1
+            - id: iam
+              uri: ${IAM_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/iam/**
+              filters:
+                - StripPrefix=1
+            - id: telemetria
+              uri: ${TELEMETRIA_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/telemetria/**
+              filters:
+                - StripPrefix=1
+            # WebSocket: o gateway troca http por ws quando há Upgrade
+            - id: realtime
+              uri: ${REALTIME_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/realtime/**
+              filters:
+                - StripPrefix=1
+pulsepass:
+  ratelimit:
+    rps: ${RATELIMIT_RPS:100}
+    burst: ${RATELIMIT_BURST:200}
 management:
   endpoints:
     web:

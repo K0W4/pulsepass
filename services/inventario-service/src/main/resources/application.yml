@@ -53,3 +53,6 @@ logging:
 pulsepass:
   reserva:
     ttl: ${RESERVA_TTL:PT10M}
+  fila:
+    # US18: admissões por segundo (por evento com a fila ligada)
+    admissoes-por-segundo: ${FILA_ADMISSOES_POR_SEGUNDO:20}

@@ -26,6 +26,12 @@ public class SecurityConfig {
                     .pathMatchers(
                         HttpMethod.GET, "/api/eventos", "/api/eventos/*", "/api/eventos/*/assentos")
                     .permitAll()
+                    // WebSocket: o navegador não envia cabeçalho; o realtime-service valida o token
+                    .pathMatchers("/api/realtime/**")
+                    .permitAll()
+                    // navegação anônima (sem dado pessoal); o rate limit protege a rota
+                    .pathMatchers(HttpMethod.POST, "/api/telemetria/navegacao")
+                    .permitAll()
                     .anyExchange()
                     .authenticated())
         .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))

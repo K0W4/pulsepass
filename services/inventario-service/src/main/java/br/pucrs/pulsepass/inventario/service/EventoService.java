@@ -32,15 +32,43 @@ public class EventoService {
     }
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "insert into evento(id, organizador_id, nome, local, data_hora, imagem_url) values (?, ?, ?, ?, ?, ?)",
+        "insert into evento(id, organizador_id, nome, local, data_hora, imagem_url, status) values (?, ?, ?, ?, ?, ?, ?)",
         id,
         organizadorId,
         r.nome(),
         r.local(),
         Timestamp.from(r.dataHora()),
-        r.imagemUrl());
+        r.imagemUrl(),
+        Boolean.FALSE.equals(r.publicar()) ? "RASCUNHO" : "PUBLICADO");
     catalogo.invalidar();
     return id;
+  }
+
+  /** US10: publica ou despublica. Quem não é o dono recebe 404, como se o evento não existisse. */
+  @Transactional
+  public void publicar(UUID eventoId, String organizadorId, boolean publicado) {
+    atualizarDoDono(
+        "update evento set status = ? where id = ? and organizador_id = ?",
+        publicado ? "PUBLICADO" : "RASCUNHO",
+        eventoId,
+        organizadorId);
+  }
+
+  /** US18: liga ou desliga a fila virtual do evento. */
+  @Transactional
+  public void filaAtiva(UUID eventoId, String organizadorId, boolean ativa) {
+    atualizarDoDono(
+        "update evento set fila_ativa = ? where id = ? and organizador_id = ?",
+        ativa,
+        eventoId,
+        organizadorId);
+  }
+
+  private void atualizarDoDono(String sql, Object valor, UUID eventoId, String organizadorId) {
+    if (jdbc.update(sql, valor, eventoId, organizadorId) != 1) {
+      throw new NaoEncontrado("evento não encontrado");
+    }
+    catalogo.invalidar();
   }
 
   @Transactional

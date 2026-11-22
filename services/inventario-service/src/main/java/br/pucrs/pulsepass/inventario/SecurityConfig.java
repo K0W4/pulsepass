@@ -22,12 +22,17 @@ public class SecurityConfig {
             a ->
                 a.requestMatchers("/actuator/health/**", "/actuator/prometheus", "/error")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/eventos/*/vendas")
+                    .requestMatchers(HttpMethod.GET, "/eventos/*/vendas", "/eventos/meus")
                     .hasRole("ORGANIZADOR")
+                    // fila virtual (US18): do cliente; vem antes do POST genérico do organizador
+                    .requestMatchers("/eventos/*/fila")
+                    .hasRole("CLIENTE")
                     .requestMatchers(
                         HttpMethod.GET, "/eventos", "/eventos/*", "/eventos/*/assentos")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/eventos/**")
+                    .hasRole("ORGANIZADOR")
+                    .requestMatchers(HttpMethod.PUT, "/eventos/*/fila-ativa")
                     .hasRole("ORGANIZADOR")
                     .requestMatchers("/reservas/**")
                     .hasRole("CLIENTE")

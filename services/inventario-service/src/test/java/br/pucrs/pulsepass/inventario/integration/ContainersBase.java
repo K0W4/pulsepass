@@ -38,6 +38,8 @@ abstract class ContainersBase {
     r.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     r.add("pulsepass.outbox.poll-ms", () -> "200");
     r.add("pulsepass.expiracao.poll-ms", () -> "300");
+    r.add("pulsepass.fila.poll-ms", () -> "200");
+    r.add("pulsepass.fila.admissoes-por-segundo", () -> "2");
   }
 
   /** Lê um tópico desde o início até o prazo, para conferir o que o Outbox publicou. */
