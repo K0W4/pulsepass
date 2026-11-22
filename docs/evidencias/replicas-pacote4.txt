@@ -1,0 +1,18 @@
+1. subir 2 réplicas de cada serviço de negócio (inventário, checkout, emissão, IAM, telemetria e tempo real)
+  ok    inventario-service com 2 réplicas no ar
+  ok    checkout-service com 2 réplicas no ar
+  ok    emissao-service com 2 réplicas no ar
+  ok    iam-service com 2 réplicas no ar
+  ok    telemetria-service com 2 réplicas no ar
+  ok    realtime-service com 2 réplicas no ar
+2. grupos de consumidores dividem as partições entre as réplicas
+  ok    grupo checkout-inventario.reserva.v1 com 2 membros (partições divididas)
+  ok    grupo inventario-checkout.pedido.v1 com 2 membros (partições divididas)
+  ok    grupo emissao-checkout.pedido.v1 com 2 membros (partições divididas)
+  ok    grupo telemetria-dominio com 2 membros (partições divididas)
+3. fluxo ponta a ponta com réplicas
+  ok    smoke completo passou com 2 réplicas de cada serviço
+4. todas as réplicas estão sendo monitoradas
+  ok    Prometheus enxerga as 14 instâncias (6 serviços x 2 réplicas, gateway e simulador)
+
+RÉPLICAS OK

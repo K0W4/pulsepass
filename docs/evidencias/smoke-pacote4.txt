@@ -1,0 +1,110 @@
+0. auto-cadastro de cliente pelo Keycloak (US01)
+  ok    cadastro aceito pelo Keycloak
+  ok    quem se cadastra recebe o papel cliente
+  ok    o novo cliente já acessa a área de cliente
+1. tokens do Keycloak
+  ok    tokens emitidos para organizador, cliente e operador
+2. organizador cadastra evento, lote e setor com 2 assentos
+  ok    criar evento
+  ok    criar lote
+  ok    criar setor com assentos
+3. catálogo público e RBAC no gateway e nos serviços
+  ok    evento aparece no catálogo sem token
+  ok    cliente não cria evento
+  ok    sem token a reserva é negada
+4. cliente reserva o assento A1
+  ok    reservar A1
+  ok    segunda reserva do mesmo assento recebe 409
+  ok    organizador não reserva
+5. pedido e pagamento idempotente
+  ok    ReservaCriada chegou ao Checkout e o pedido ficou RESERVADO
+  ok    primeiro pagamento
+  ok    segundo pagamento com a mesma chave
+  ok    resposta idêntica à primeira
+  ok    pedido PAGO
+  ok    pagamento sem Idempotency-Key
+6. ingresso emitido, PDF e validação na portaria
+  ok    ingresso emitido após PedidoPago
+  ok    PDF do ingresso
+  ok    primeira leitura
+  ok    resultado LIBERADO
+  ok    segunda leitura
+  ok    resultado JA_UTILIZADO
+  ok    informa o horário da primeira leitura
+  ok    QR forjado é INVALIDO
+  ok    cliente não valida ingressos
+7. venda refletida no catálogo
+  ok    AssentoVendido refletido no catálogo
+8. observabilidade: métricas, trace único da compra e dashboard (RNF16)
+  ok    Prometheus coleta métricas HTTP do checkout-service
+  ok    um único trace atravessa gateway, checkout, emissão e inventário
+  ok    dashboard PulsePass provisionado no Grafana
+  ok    dashboard com os painéis de telemetria e de tempo real
+9. renovação de sessão pelo refresh token (US03, RNF12)
+  ok    access token de 15 minutos
+  ok    refresh token de 7 dias
+  ok    o refresh token devolve um access token novo
+  ok    o token renovado é aceito pelo gateway
+10. busca no catálogo e publicação de eventos (US13, US10)
+  ok    busca por nome (sem maiúsculas)
+  ok    busca por nome e local
+  ok    busca por outro local não traz o evento
+  ok    busca pelo dia do evento
+  ok    busca anterior à data não traz o evento
+  ok    data inválida é recusada
+  ok    cliente não despublica
+  ok    organizador despublica
+  ok    evento despublicado sai do catálogo
+  ok    evento despublicado dá 404
+  ok    o organizador ainda vê o rascunho em 'meus eventos'
+  ok    organizador publica de novo
+  ok    evento publicado volta ao catálogo
+11. fila virtual, tempo real e e-mail do ingresso (US18, US14, US27, US25)
+  ok    organizador liga a fila virtual
+  ok    sem admissão, a reserva é negada
+  ok    motivo FILA_VIRTUAL
+  ok    cliente entra na fila
+  ok    a fila admite o cliente
+  ok    com a admissão, a reserva passa
+  ok    tempo real: o WebSocket do evento recebeu AssentoReservado
+  ok    a admissão vale uma reserva
+  ok    organizador desliga a fila
+  ok    pedido do cliente novo RESERVADO
+  ok    canal do pedido é fechado para quem não tem token
+  ok    canal do pedido é fechado para o papel operador
+  ok    realtime-service: handshake do pedido sem token dá 401
+  ok    realtime-service: token inválido dá 401
+  ok    realtime-service: token de cliente é aceito (101)
+  ok    cliente novo paga
+  ok    tempo real: o canal do pedido recebeu IngressoEmitido
+  ok    tempo real: o canal do evento recebeu AssentoVendido
+  ok    o WebSocket atravessa o Nginx da SPA
+  ok    e-mail com o ingresso em PDF chegou ao Mailpit
+  ok    SPA responde na porta 3000
+12. telemetria e painel analítico (US32, US33, RNF08)
+  ok    navegação anônima aceita
+  ok    cliente não vê o painel
+  ok    organizador não vê as métricas operacionais
+  ok    o painel agrega reservas, pagamentos, ingressos e navegação
+  ok    RNF08: o p95 da emissão está dentro de 30 s
+  ok    p95 medido = 0.4 s com 4 pedidos
+  ok    US33: latência, erros e lag do Kafka lidos do Prometheus
+13. IAM: organizador com aprovação do admin e auditoria (US05, US06)
+  ok    antes do pedido não há solicitação
+  ok    CNPJ com dígito errado é recusado
+  ok    cliente pede para ser organizador
+  ok    segunda solicitação pendente é recusada
+  ok    ainda não é organizador
+  ok    cliente não aprova
+  ok    organizador não vê a auditoria
+  ok    admin vê a solicitação pendente
+  ok    admin aprova (o iam-service atribui o papel no Keycloak real)
+  ok    decidir duas vezes dá 409
+  ok    o token renovado traz o papel organizador
+  ok    o novo organizador cria evento
+  ok    auditoria reúne logins, falha de login e a aprovação
+14. rate limit no gateway
+  ok    rate limit: 371 de 600 requisições anônimas simultâneas receberam 429
+  ok    depois da pausa o gateway volta a responder
+
+SMOKE OK

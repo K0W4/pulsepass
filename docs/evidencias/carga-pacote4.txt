@@ -1,0 +1,7 @@
+aquecendo o gateway e o inventário (6.000 requisições)
+RNF06: catálogo, 1.000 req/s por 30 s
+              * catalogo: 1000.00 iterations/s for 30s (maxVUs: 200-1000, gracefulStop: 30s)
+  catalogo: p95=9.4 ms, taxa=992 req/s, falhas=0.00%, thresholds ATENDIDOS
+RNF07: reserva, 200 req/s por 30 s
+              * reserva: 200.00 iterations/s for 30s (maxVUs: 100-600, gracefulStop: 30s)
+  reserva: p95=34.9 ms, taxa=195 req/s, falhas=0.00%, thresholds ATENDIDOS

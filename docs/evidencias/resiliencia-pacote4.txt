@@ -1,0 +1,28 @@
+1. preparar evento com um assento
+  ok    reserva criada
+  ok    pedido RESERVADO
+2. derrubar o emissao-service e comprar
+ Container pulsepass-emissao-service-1 Stopping 
+ Container pulsepass-emissao-service-1 Stopped 
+  ok    com a Emissão fora, o gateway responde 503 para ingressos
+  ok    pagamento aprovado com a Emissão fora do ar
+  ok    pedido PAGO
+  ok    Inventário confirmou a venda sem depender da Emissão
+3. a Emissão volta e processa o que ficou retido no Kafka
+ Container pulsepass-kafka-1 Waiting 
+ Container pulsepass-kafka-1 Healthy 
+ Container pulsepass-kafka-init-1 Starting 
+ Container pulsepass-kafka-init-1 Started 
+ Container pulsepass-postgres-1 Waiting 
+ Container pulsepass-kafka-1 Waiting 
+ Container pulsepass-kafka-init-1 Waiting 
+ Container pulsepass-keycloak-1 Waiting 
+ Container pulsepass-kafka-1 Healthy 
+ Container pulsepass-postgres-1 Healthy 
+ Container pulsepass-keycloak-1 Healthy 
+ Container pulsepass-kafka-init-1 Exited 
+ Container pulsepass-emissao-service-1 Starting 
+ Container pulsepass-emissao-service-1 Started 
+  ok    ingresso emitido depois que a Emissão voltou
+
+RESILIÊNCIA OK
