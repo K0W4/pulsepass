@@ -25,7 +25,19 @@ spring:
       resourceserver:
         jwt:
           jwk-set-uri: ${JWK_SET_URI:http://localhost:8081/realms/pulsepass/protocol/openid-connect/certs}
+  mail:
+    # Mailpit no Compose (SMTP 1025, caixa de entrada em http://localhost:8025)
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    properties:
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 management:
+  health:
+    # SMTP fora do ar não pode derrubar a saúde do serviço: o e-mail é tentado de novo depois (RNF11)
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:

@@ -65,6 +65,14 @@ public class PagamentoService {
   private record Iniciado(Resposta repetida, UUID pagamentoId, BigDecimal valor) {}
 
   public Resposta pagar(String clienteId, String idempotencyKey, UUID pedidoId) {
+    return pagar(clienteId, null, idempotencyKey, pedidoId);
+  }
+
+  /**
+   * {@code email} vem do token do comprador e só viaja no evento PedidoPago, para a Emissão enviar
+   * o ingresso (US25); o Checkout não o guarda em tabela nenhuma (RNF15).
+   */
+  public Resposta pagar(String clienteId, String email, String idempotencyKey, UUID pedidoId) {
     String chave = clienteId + ":" + idempotencyKey;
     Iniciado inicio = tx.execute(s -> iniciar(clienteId, chave, pedidoId));
     if (inicio.repetida() != null) {
@@ -79,7 +87,7 @@ public class PagamentoService {
       throw new ResponseStatusException(
           HttpStatus.SERVICE_UNAVAILABLE, "gateway de pagamento indisponível");
     }
-    return tx.execute(s -> concluir(chave, pedidoId, inicio.pagamentoId(), resultado));
+    return tx.execute(s -> concluir(chave, pedidoId, inicio.pagamentoId(), resultado, email));
   }
 
   /** TX1: registra a chave, move o pedido para AGUARDANDO e cria o pagamento PENDENTE. */
@@ -144,7 +152,11 @@ public class PagamentoService {
 
   /** TX2: aprova (PAGO) ou recusa (volta a RESERVADO) e guarda a resposta na chave. */
   private Resposta concluir(
-      String chave, UUID pedidoId, UUID pagamentoId, GatewayPagamentoClient.Resultado r) {
+      String chave,
+      UUID pedidoId,
+      UUID pagamentoId,
+      GatewayPagamentoClient.Resultado r,
+      String email) {
     var pedido =
         jdbc.queryForMap(
             "select status, reserva_id, cliente_id from pedido where id = ? for update", pedidoId);
@@ -164,7 +176,7 @@ public class PagamentoService {
           Eventos.TOPICO_PEDIDO,
           pedidoId.toString(),
           "PedidoPago",
-          pedidoPago(pedidoId, reservaId, pedido));
+          pedidoPago(pedidoId, reservaId, pedido, email));
       resposta =
           resposta(200, Map.of("pedidoId", pedidoId, "status", "PAGO", "pagamentoId", pagamentoId));
     } else if (r.aprovado()) {
@@ -230,7 +242,8 @@ public class PagamentoService {
     jdbc.update("delete from chave_idempotencia where chave = ?", chave);
   }
 
-  private PedidoPago pedidoPago(UUID pedidoId, UUID reservaId, Map<String, Object> pedido) {
+  private PedidoPago pedidoPago(
+      UUID pedidoId, UUID reservaId, Map<String, Object> pedido, String email) {
     var ref =
         jdbc.queryForMap(
             "select evento_id, evento_nome from reserva_ref where reserva_id = ?", reservaId);
@@ -255,7 +268,8 @@ public class PagamentoService {
         (String) ref.get("evento_nome"),
         itens,
         total,
-        Instant.now());
+        Instant.now(),
+        email == null || email.isBlank() ? null : email);
   }
 
   private Resposta resposta(int status, Map<String, Object> corpo) {

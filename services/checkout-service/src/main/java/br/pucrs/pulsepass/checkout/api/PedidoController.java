@@ -58,7 +58,8 @@ public class PedidoController {
     if (r.pedidoId() == null) {
       throw new Invalido("pedidoId é obrigatório");
     }
-    var resposta = pagamentos.pagar(jwt.getSubject(), chave, r.pedidoId());
+    var resposta =
+        pagamentos.pagar(jwt.getSubject(), jwt.getClaimAsString("email"), chave, r.pedidoId());
     return ResponseEntity.status(resposta.status())
         .contentType(MediaType.APPLICATION_JSON)
         .body(resposta.corpo());

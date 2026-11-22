@@ -335,4 +335,46 @@ class CheckoutIT extends Stack {
         .andExpect(status().isNotFound());
     pagar("outro-cliente", "k-x", pedido).andExpect(status().isNotFound());
   }
+
+  /** US25: o e-mail do token viaja no PedidoPago (para a Emissão) e não fica em nenhuma tabela. */
+  @Test
+  void pedidoPagoLevaOEmailDoTokenSemGuardaloNoBanco() throws Exception {
+    UUID comEmail = pedidoReservado("c-email");
+    mvc.perform(
+            post("/pagamentos")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject("c-email").claim("email", "ana@exemplo.test"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_CLIENTE")))
+                .header("Idempotency-Key", "k-email")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"pedidoId\":\"" + comEmail + "\"}"))
+        .andExpect(status().isOk());
+
+    var corpo =
+        jdbc.queryForObject(
+            "select body from outbox_event where msg_key = ? and body like '%PedidoPago%'",
+            String.class, comEmail.toString());
+    assertThat(mapper.readTree(corpo).at("/payload/clienteEmail").asText())
+        .isEqualTo("ana@exemplo.test");
+    // nenhuma tabela do Checkout guarda o endereço
+    for (String tabela :
+        List.of("pedido", "pedido_item", "pagamento", "chave_idempotencia", "reserva_ref")) {
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from " + tabela + " t where t::text like '%ana@exemplo.test%'",
+                  Integer.class))
+          .as(tabela)
+          .isZero();
+    }
+
+    // sem e-mail no token, o campo vai nulo e o pagamento segue normalmente
+    UUID semEmail = pedidoReservado("c-sem-email");
+    pagar("c-sem-email", "k-sem-email", semEmail).andExpect(status().isOk());
+    var semCorpo =
+        jdbc.queryForObject(
+            "select body from outbox_event where msg_key = ? and body like '%PedidoPago%'",
+            String.class, semEmail.toString());
+    assertThat(mapper.readTree(semCorpo).at("/payload/clienteEmail").isNull()).isTrue();
+  }
 }

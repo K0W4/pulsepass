@@ -65,5 +65,14 @@ public class EmissaoService {
       }
       ordem++;
     }
+    // e-mail (US25): na mesma transação, para não haver ingresso sem aviso nem aviso sem ingresso;
+    // a unicidade por pedido impede mandar de novo se o evento chegar outra vez
+    if (pedido.clienteEmail() != null && !pedido.clienteEmail().isBlank()) {
+      jdbc.update(
+          "insert into notificacao(id, pedido_id, destinatario) values (?, ?, ?) on conflict (pedido_id) do nothing",
+          UUID.randomUUID(),
+          pedido.pedidoId(),
+          pedido.clienteEmail());
+    }
   }
 }
