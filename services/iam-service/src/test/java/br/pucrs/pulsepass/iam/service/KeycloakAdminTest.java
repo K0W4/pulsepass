@@ -118,7 +118,26 @@ class KeycloakAdminTest {
               p ->
                   p.startsWith("POST /admin/realms/pulsepass/users/user-1/role-mappings/realm")
                       && p.endsWith("auth=Bearer tok-1"));
-      assertThat(corpos).contains("[{\"id\":\"papel-id-1\",\"name\":\"organizador\"}]");
+      // compara como JSON: a ordem das chaves de um Map.of muda de uma JVM para outra
+      var esperado =
+          new com.fasterxml.jackson.databind.ObjectMapper()
+              .createArrayNode()
+              .add(
+                  new com.fasterxml.jackson.databind.ObjectMapper()
+                      .createObjectNode()
+                      .put("id", "papel-id-1")
+                      .put("name", "organizador"));
+      assertThat(corpos)
+          .anyMatch(
+              c -> {
+                try {
+                  return new com.fasterxml.jackson.databind.ObjectMapper()
+                      .readTree(c)
+                      .equals(esperado);
+                } catch (Exception e) {
+                  return false;
+                }
+              });
       // o pedido de token usa a conta de serviço
       assertThat(corpos.get(0))
           .contains(

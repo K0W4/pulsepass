@@ -105,7 +105,7 @@ precisa estar rodando). Principais garantias verificadas:
 | RNF14 QR assinado | QR adulterado ou assinado com outro segredo é rejeitado; 50 leituras simultâneas liberam exatamente 1 (`EmissaoIT`) |
 | RNF15 LGPD | o endereço de e-mail some da tabela depois do envio ou da falha definitiva (`NotificacaoIT`); o Checkout não grava o e-mail (`CheckoutIT`); a navegação é anônima e de lista fechada (`TelemetriaIT`) |
 | RNF16 observabilidade | `smoke.sh`: um único trace atravessa gateway, Checkout, Emissão e Inventário (inclusive Outbox e Kafka); métricas no Prometheus; dashboard no Grafana |
-| RNF22 acessibilidade | Lighthouse 100 nas páginas públicas; axe-core sem violações WCAG A/AA em todas as telas |
+| RNF22 acessibilidade | Lighthouse 100 nas páginas públicas; axe-core sem violações WCAG A/AA em todas as telas, inclusive as do Pacote 4 (`docs/evidencias/axe-pacote4.json`) |
 | RNF23 fila virtual | ordem de chegada, admissão por taxa, bloqueio e consumo da admissão (`FilaVirtualIT`); `smoke.sh` pelo gateway |
 | US05 e US06 IAM | aprovação com Keycloak real (`smoke.sh`), rollback se o Keycloak falha, auditoria sem duplicar (`IamIT`, `KeycloakAdminTest`) |
 | US10 e US13 | rascunho, publicação e busca por nome, local e data (`BuscaPublicacaoIT`, `FiltroCatalogoTest`) |

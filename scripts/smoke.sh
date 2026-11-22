@@ -187,7 +187,7 @@ node scripts/ws-espera.mjs "$WS/api/realtime/pedidos/$PED2?token=$(token operado
 ok "canal do pedido é fechado para o papel operador"
 # direto no serviço (fora do gateway) a recusa é um 401 no handshake
 upgrade() { docker compose exec -T realtime-service curl -s -m 2 -o /dev/null -w '%{http_code}' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
-  -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==' "http://localhost:8080/realtime/pedidos/$PED2$1" || true; }
+  -H 'Sec-WebSocket-Version: 13' -H "Sec-WebSocket-Key: $(openssl rand -base64 16)" "http://localhost:8080/realtime/pedidos/$PED2$1" || true; }
 espero "$(upgrade '')" 401 "realtime-service: handshake do pedido sem token dá 401"
 espero "$(upgrade '?token=lixo')" 401 "realtime-service: token inválido dá 401"
 espero "$(upgrade "?token=$NOVO_TOKEN")" 101 "realtime-service: token de cliente é aceito (101)"

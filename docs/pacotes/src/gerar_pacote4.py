@@ -154,7 +154,7 @@ rnf = [
  ('RNF19', 'Ambiente com um comando', OK, c('docker compose up -d --wait') + ' sobe todos os contêineres saudáveis; verificado do zero.'),
  ('RNF20', 'CI bloqueia PR vermelho', PARC, 'Workflow estendido aos módulos novos; CI deste pacote: ' + ci + '. Os checks obrigatórios (proteção de branch) ainda não estão ligados, então o bloqueio do PR não está ativo.'),
  ('RNF21', 'Compra em até 5 telas', OK, 'Detalhe, assentos (com a espera na fila, se houver), checkout e meus ingressos.'),
- ('RNF22', 'Acessibilidade WCAG AA', PARC, 'A auditoria do Pacote 3 (Lighthouse 100 e axe sem violações) vale para as telas daquele pacote. As telas novas (busca, espera na fila, administração, painel, solicitação de organizador) seguem os mesmos padrões (rótulos, tabelas com legenda, regiões ' + c('aria-live') + ', foco no título), mas não foram reauditadas com o axe.'),
+ ('RNF22', 'Acessibilidade WCAG AA', OK, 'axe-core 4.10.2 (WCAG 2.0 e 2.1, A e AA) sem nenhuma violação em 12 telas e estados com os quatro papéis, inclusive as novas (busca, fila, administração, painel, solicitação de organizador, portaria); detalhes em ' + c('docs/evidencias/axe-pacote4.json') + '. O Lighthouse 100 do Pacote 3 vale para as páginas públicas. Limites: o axe cobre só a parte automatizável, a navegação por teclado e o leitor de tela não foram testados à mão, o checkout não entrou nesta rodada, e a auditoria não roda na CI.'),
  ('RNF23', 'Fila virtual por ordem de chegada', OK, c('FilaVirtualIT') + ': a ordem é a de chegada, a admissão respeita a taxa e entrar de novo mantém a posição.'),
 ]
 
@@ -215,7 +215,7 @@ html = '''<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>P
 <tr><td>Enunciado</td><td>@@COB_OK@@ de @@COB_TOT@@ requisitos atendidos e @@COB_PARC@@ parciais (seção 2).</td></tr>
 <tr><td>Histórias do backlog</td><td>@@US_OK@@ histórias atendidas (US01 a US29, US31 a US33); US30 e US34 a US39 (candidatas de R3) ficam fora do produto (seção 3).</td></tr>
 <tr><td>Requisitos não funcionais</td><td>@@NOK@@ atendidos, @@NPARC@@ parciais, @@NPEND@@ pendentes (seção 4).</td></tr></table>
-<div class="box"><b>Limites honestos.</b> As medições de carga foram feitas num laptop, sem latência de rede real; servem para verificar as metas, não como benchmark. A cobertura de 70% mede o pacote <code>domain</code> (máquinas de estado e regras puras); a orquestração é exercida pelos testes de integração e não entra nesse percentual. A CI só roda no GitHub, depois do push: o resultado deste pacote está em branco até lá. A leitura do QR pela câmera usa a API <code>BarcodeDetector</code>, disponível no Chrome e no Edge (Android e macOS); nos demais navegadores a portaria digita o código, e essa leitura não foi exercitada com uma câmera de verdade nesta verificação. As telas novas não foram reauditadas com o axe-core. O rate limit conta por réplica do gateway (ADR-010).</div>
+<div class="box"><b>Limites honestos.</b> As medições de carga foram feitas num laptop, sem latência de rede real; servem para verificar as metas, não como benchmark. A cobertura de 70% mede o pacote <code>domain</code> (máquinas de estado e regras puras); a orquestração é exercida pelos testes de integração e não entra nesse percentual. A CI só roda no GitHub, depois do push: o resultado deste pacote está em branco até lá. A leitura do QR pela câmera usa a API <code>BarcodeDetector</code>, disponível no Chrome e no Edge (Android e macOS); nos demais navegadores a portaria digita o código, e essa leitura não foi exercitada com uma câmera de verdade nesta verificação. A auditoria de acessibilidade (axe-core) cobre só a parte automatizável e não roda na CI. O rate limit conta por réplica do gateway (ADR-010).</div>
 
 <h2>1.1 Como reproduzir</h2>
 <pre>cp .env.example .env
@@ -279,7 +279,7 @@ docker compose down -v</pre>
 <ul>
   <li>Rate limit global (balde no Redis) em vez de por réplica; ticket de uso único para o WebSocket do pedido; retenção das métricas por minuto.</li>
   <li>Limpeza do e-mail do corpo do evento (hoje fica 7 dias no Kafka); revisão formal dos logs (LGPD).</li>
-  <li>Reauditar a acessibilidade das telas novas e rodar o axe e o Lighthouse na CI.</li>
+  <li>Levar o axe e o Lighthouse para a CI e testar a navegação por teclado e o leitor de tela à mão.</li>
   <li>Histórias de R3 não detalhadas (US30, US34 a US39).</li>
 </ul>
 </div>
